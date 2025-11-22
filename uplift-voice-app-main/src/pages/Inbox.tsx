@@ -94,8 +94,8 @@ const Inbox: React.FC = () => {
                 '/images/image 14 (1).png'
               ];
               return (
-              <Card key={issue._id} className={`bg-white border-2 ${getPriorityBorderColor(issue.priority)} hover:shadow-lg transition-shadow`}>
-                <CardContent className="p-4">
+              <Card key={issue._id} className={`bg-white border-2 ${getPriorityBorderColor(issue.priority)} hover:shadow-lg transition-shadow h-full`}>
+                <CardContent className="p-4 h-full flex flex-col">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
                       <Mail className="w-4 h-4 text-white" />
@@ -111,7 +111,7 @@ const Inbox: React.FC = () => {
                     />
                   </div>
 
-                  <div className="mb-4">
+                  <div className="mb-4 flex-grow">
                     <p className="text-sm text-gray-600 mb-2 line-clamp-3">
                       {issue.description}
                     </p>
@@ -122,7 +122,7 @@ const Inbox: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mb-3">
+                  <div className="mb-3 mt-auto">
                     <StatusProgression
                       currentStatus={issue.status}
                       issueId={issue._id}
