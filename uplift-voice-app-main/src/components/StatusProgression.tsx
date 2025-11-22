@@ -44,11 +44,11 @@ const StatusProgression: React.FC<StatusProgressionProps> = ({
     <>
       <div className="flex flex-col items-center gap-4">
         {/* Status Circles with Labels */}
-        <div className="flex items-center justify-center gap-8">
+        <div className="flex items-start justify-center gap-6">
           {STATUS_STAGES.map((stage, index) => (
-            <div key={stage.name} className="flex flex-col items-center gap-2">
+            <div key={stage.name} className="flex flex-col items-center gap-2 min-w-[60px]">
               <button
-                onClick={() => handleStatusClick(stage.name, index)}
+                onClick={() => handleStatusClick(stage.name.replace('\n', ' '), index)}
                 className={`w-6 h-6 rounded-full transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
                   index === currentIndex 
                     ? 'bg-green-500 ring-2 ring-green-300' 
@@ -60,13 +60,15 @@ const StatusProgression: React.FC<StatusProgressionProps> = ({
                     ? 'cursor-pointer' 
                     : 'cursor-default'
                 }`}
-                title={`${stage.name}${onStatusUpdate && index === currentIndex + 1 ? ' (Click to advance)' : ''}`}
+                title={`${stage.name.replace('\n', ' ')}${onStatusUpdate && index === currentIndex + 1 ? ' (Click to advance)' : ''}`}
                 disabled={!onStatusUpdate || index !== currentIndex + 1}
               />
-              <span className={`text-xs font-medium ${
+              <span className={`text-xs font-medium text-center leading-tight ${
                 index === currentIndex ? 'text-green-600' : 'text-gray-500'
               }`}>
-                {stage.name}
+                {stage.name.split('\n').map((line, lineIndex) => (
+                  <div key={lineIndex}>{line}</div>
+                ))}
               </span>
             </div>
           ))}
