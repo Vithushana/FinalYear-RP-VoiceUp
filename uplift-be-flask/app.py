@@ -3,6 +3,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 from auth import auth_bp
+from api_routes import api
 
 load_dotenv()
 PORT = int(os.getenv("PORT", "5000"))
@@ -14,9 +15,20 @@ def create_app() -> Flask:
 
     @app.get("/api/health")
     def health():
-        return jsonify({"ok": True, "service": "voiceup-backend", "status": "healthy"})
+        return jsonify({
+            "ok": True, 
+            "service": "voiceup-backend", 
+            "status": "healthy",
+            "endpoints": {
+                "auth": "/api/auth/login, /api/auth/signup",
+                "dashboard": "/api/stats, /api/issues, /api/issues/<id>"
+            }
+        })
 
+    # Register blueprints
     app.register_blueprint(auth_bp)
+    app.register_blueprint(api, url_prefix='/api')
+    
     return app
 
 

@@ -72,7 +72,7 @@ export const ReportForm = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Submit a Report</CardTitle>
+        <CardTitle>Submit a Reply to a Report</CardTitle>
         <CardDescription>
           Report road issues in your community. All submissions are verified by AI for authenticity and relevance.
         </CardDescription>

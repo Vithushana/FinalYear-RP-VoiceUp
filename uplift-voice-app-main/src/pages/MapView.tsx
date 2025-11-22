@@ -3,6 +3,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Calendar } from "lucide-react";
+import { getPriorityBorderColor } from "@/utils/priorityColors";
 
 const MapView = () => {
   // Mock data for reported issues
@@ -13,6 +14,7 @@ const MapView = () => {
       location: "Main Street & Oak Avenue",
       date: "2024-03-15",
       status: "verified",
+      priority: "critical",
       coordinates: { lat: 40.7128, lng: -74.0060 },
     },
     {
@@ -21,6 +23,7 @@ const MapView = () => {
       location: "5th Street & Park Avenue",
       date: "2024-03-14",
       status: "under-review",
+      priority: "medium",
       coordinates: { lat: 40.7580, lng: -73.9855 },
     },
     {
@@ -29,6 +32,7 @@ const MapView = () => {
       location: "Elm Street",
       date: "2024-03-13",
       status: "resolved",
+      priority: "low",
       coordinates: { lat: 40.7589, lng: -73.9851 },
     },
   ];
@@ -87,7 +91,7 @@ const MapView = () => {
                   {reportedIssues.map((issue) => (
                     <div
                       key={issue.id}
-                      className="p-4 rounded-lg border hover:border-primary transition-colors cursor-pointer"
+                      className={`p-4 rounded-lg border-2 ${getPriorityBorderColor(issue.priority)} hover:border-primary transition-colors cursor-pointer`}
                     >
                       <div className="flex items-start gap-3 mb-3">
                         <MapPin className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />

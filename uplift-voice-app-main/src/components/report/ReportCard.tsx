@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Calendar, MapPin } from "lucide-react";
+import { getPriorityBorderColor } from "@/utils/priorityColors";
 
 interface ReportCardProps {
   id: string;
@@ -9,6 +10,7 @@ interface ReportCardProps {
   location: string;
   date: string;
   status: "pending" | "under-review" | "verified" | "rejected" | "resolved";
+  priority?: string;
   image?: string;
 }
 
@@ -26,12 +28,13 @@ export const ReportCard = ({
   location,
   date,
   status,
+  priority,
   image,
 }: ReportCardProps) => {
   const { label, variant } = statusConfig[status];
 
   return (
-    <Card className="overflow-hidden hover:shadow-medium transition-smooth">
+    <Card className={`overflow-hidden hover:shadow-medium transition-smooth border-2 ${getPriorityBorderColor(priority || 'low')}`}>
       {image && (
         <div className="aspect-video w-full overflow-hidden bg-muted">
           <img
