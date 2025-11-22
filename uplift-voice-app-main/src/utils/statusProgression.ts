@@ -10,11 +10,13 @@ export const STATUS_STAGES: StatusStage[] = [
   { name: 'Verified', index: 1, color: 'text-green-700', bgColor: 'bg-green-500' },
   { name: 'In\nProgress', index: 2, color: 'text-yellow-700', bgColor: 'bg-yellow-500' },
   { name: 'On\nHold', index: 3, color: 'text-orange-700', bgColor: 'bg-orange-500' },
-  { name: 'Completed', index: 4, color: 'text-green-700', bgColor: 'bg-green-500' },
+  { name: 'Complete', index: 4, color: 'text-green-700', bgColor: 'bg-green-500' },
 ];
 
 export const getStatusIndex = (status: string): number => {
-  const stage = STATUS_STAGES.find(s => s.name === status || s.name.replace('\n', ' ') === status);
+  // Handle both "Complete" and "Completed" for backward compatibility
+  const normalizedStatus = status === 'Completed' ? 'Complete' : status;
+  const stage = STATUS_STAGES.find(s => s.name === normalizedStatus || s.name.replace('\n', ' ') === normalizedStatus);
   return stage ? stage.index : 0;
 };
 
@@ -27,7 +29,9 @@ export const getNextStatus = (currentStatus: string): string | null => {
 };
 
 export const getStatusColor = (status: string): { color: string; bgColor: string } => {
-  const stage = STATUS_STAGES.find(s => s.name === status || s.name.replace('\n', ' ') === status);
+  // Handle both "Complete" and "Completed" for backward compatibility
+  const normalizedStatus = status === 'Completed' ? 'Complete' : status;
+  const stage = STATUS_STAGES.find(s => s.name === normalizedStatus || s.name.replace('\n', ' ') === normalizedStatus);
   return stage ? { color: stage.color, bgColor: stage.bgColor } : { color: 'text-gray-700', bgColor: 'bg-gray-500' };
 };
 

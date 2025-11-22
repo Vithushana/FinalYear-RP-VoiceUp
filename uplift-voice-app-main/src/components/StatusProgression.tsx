@@ -44,9 +44,9 @@ const StatusProgression: React.FC<StatusProgressionProps> = ({
     <>
       <div className="flex flex-col items-center gap-4">
         {/* Status Circles with Labels */}
-        <div className="flex items-start justify-center gap-6">
+        <div className="flex items-start justify-center gap-4">
           {STATUS_STAGES.map((stage, index) => (
-            <div key={stage.name} className="flex flex-col items-center gap-2 min-w-[60px]">
+            <div key={stage.name} className="flex flex-col items-center gap-2 min-w-[70px]">
               <button
                 onClick={() => handleStatusClick(stage.name.replace('\n', ' '), index)}
                 className={`w-6 h-6 rounded-full transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
