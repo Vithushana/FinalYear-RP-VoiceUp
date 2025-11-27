@@ -143,6 +143,7 @@ export const ReportForm = () => {
                       type="button"
                       onClick={() => removeImage(index)}
                       className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90"
+                      title="Remove image"
                     >
                       <X className="h-4 w-4" />
                     </button>
