@@ -16,8 +16,100 @@ const Index = () => {
     { title: "In Progress", value: "0", color: "text-orange-600" },
     { title: "Achievements", value: "0", color: "text-purple-600" },
   ]);
-  const [issues, setIssues] = useState([]);
-  const [repostedIssues, setRepostedIssues] = useState([]);
+  const [issues, setIssues] = useState([
+    {
+      _id: "1",
+      status: "Verified",
+      description: "Significant crack in sidewalk verified by inspection team, awaiting repair scheduling.",
+      location: "Business District, 7th Street",
+      time: "2 hours ago",
+      priority: 2,
+      image: "/images/image 13.png",
+    },
+    {
+      _id: "2",
+      status: "On hold",
+      description: "Ongoing noise complaint has been resolved through legal channels and case is closed.",
+      location: "Residential Area, Block 12",
+      time: "2 hours ago",
+      priority: 3,
+      image: "/images/image 13 (1).png",
+    },
+    {
+      _id: "3",
+      status: "On Hold",
+      description: "Multiple parking meters not accepting payment. Waiting for parts delivery to complete repairs.",
+      location: "Downtown Shopping District",
+      time: "2 hours ago",
+      priority: 2,
+      image: "/images/image 13 (2).png",
+    },
+    {
+      _id: "4",
+      status: "In Progress",
+      description: "Road surface repair currently underway. Expected completion by end of week.",
+      location: "Main Street, Block 8",
+      time: "3 hours ago",
+      priority: 1,
+      image: "/images/image 14 (1).png",
+    },
+    {
+      _id: "5",
+      status: "Completed",
+      description: "Pothole repair has been completed successfully. Road surface restored to safe condition.",
+      location: "Highway 21, Mile Marker 15",
+      time: "4 hours ago",
+      priority: 1,
+      image: "/images/image 14 (2).png",
+    },
+    {
+      _id: "6",
+      status: "Seen",
+      description: "New report of damaged road markings affecting traffic flow during rush hours.",
+      location: "Central Avenue Intersection",
+      time: "5 hours ago",
+      priority: 2,
+      image: "/images/image 15 (2).png",
+    },
+  ]);
+  const [repostedIssues, setRepostedIssues] = useState([
+    {
+      _id: "7",
+      status: "Verified",
+      description: "The stop sign at the intersection of Pine and Cedar was knocked down during the storm last week. This intersection is very dangerous without proper signage.",
+      location: "Pine St & Cedar Ave Intersection",
+      time: "11 days ago",
+      priority: 1,
+      image: "/images/image 16 (1).png",
+    },
+    {
+      _id: "8",
+      status: "Completed",
+      description: "The traffic light at the main intersection is stuck on red in all directions. This is causing major traffic congestion during rush hours.",
+      location: "Main St & Broadway Intersection",
+      time: "11 days ago",
+      priority: 1,
+      image: "/images/image 17 (1).png",
+    },
+    {
+      _id: "9",
+      status: "Seen",
+      description: "The public trash bin near the bus stop has been overflowing for days. It's attracting pests and creating an unsanitary condition.",
+      location: "Bus Stop, Oak Street",
+      time: "21 days ago",
+      priority: 2,
+      image: "/images/Rectangle 25.png",
+    },
+    {
+      _id: "10",
+      status: "Completed",
+      description: "Multiple deep potholes have formed on this busy road section, causing damage to vehicles and creating safety hazards.",
+      location: "Main St & Broadway Intersection",
+      time: "11 days ago",
+      priority: 1,
+      image: "/images/Groups (1).png",
+    },
+  ]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

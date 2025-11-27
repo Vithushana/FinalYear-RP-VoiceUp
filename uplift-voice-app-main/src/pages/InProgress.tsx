@@ -10,7 +10,34 @@ import { getStatusColor } from '@/utils/statusProgression';
 import { getPriorityBorderColor } from '@/utils/priorityColors';
 
 const InProgress: React.FC = () => {
-  const [issues, setIssues] = useState<Issue[]>([]);
+  const [issues, setIssues] = useState([
+    {
+      _id: "1",
+      userName: "Albert",
+      userUploadImages: ["/images/image1.png"],
+      id: "1",
+      title: "In Progress Road Crack",
+      description: "A road crack near the town center is being repaired.",
+      location: "Town Center, Colombo",
+      category: "Road Crack",
+      status: "In Progress",
+      priority: "2",
+      dateCreated: "2025-07-28",
+    },
+    {
+      _id: "2",
+      userName: "Albert",
+      userUploadImages: ["/images/image2.png"],
+      id: "2",
+      title: "In Progress Pothole",
+      description: "Potholes on the main road are being repaired.",
+      location: "Main Road, Colombo",
+      category: "Pothole",
+      status: "In Progress",
+      priority: "1",
+      dateCreated: "2025-07-29",
+    },
+  ]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 

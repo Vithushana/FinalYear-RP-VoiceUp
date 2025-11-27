@@ -10,7 +10,34 @@ import { getStatusColor } from '@/utils/statusProgression';
 import { getPriorityBorderColor } from '@/utils/priorityColors';
 
 const OnHold: React.FC = () => {
-  const [issues, setIssues] = useState<Issue[]>([]);
+  const [issues, setIssues] = useState([
+    {
+      _id: "1",
+      userName: "Albert",
+      userUploadImages: ["/images/image1.png"],
+      id: "1",
+      title: "On Hold Road Crack",
+      description: "A road crack near the town center is on hold for further inspection.",
+      location: "Town Center, Colombo",
+      category: "Road Crack",
+      status: "On Hold",
+      priority: "2",
+      dateCreated: "2025-07-28",
+    },
+    {
+      _id: "2",
+      userName: "Albert",
+      userUploadImages: ["/images/image2.png"],
+      id: "2",
+      title: "On Hold Pothole",
+      description: "Potholes on the main road are on hold for further inspection.",
+      location: "Main Road, Colombo",
+      category: "Pothole",
+      status: "On Hold",
+      priority: "1",
+      dateCreated: "2025-07-29",
+    },
+  ]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
