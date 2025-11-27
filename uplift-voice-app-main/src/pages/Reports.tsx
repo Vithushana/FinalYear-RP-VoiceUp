@@ -13,6 +13,7 @@ const Reports = () => {
       location: "Main Street & Oak Avenue",
       date: "2024-03-15",
       status: "verified" as const,
+      priority: "critical",
       image: "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=800",
     },
     {
@@ -22,6 +23,7 @@ const Reports = () => {
       location: "5th Street & Park Avenue",
       date: "2024-03-14",
       status: "under-review" as const,
+      priority: "medium",
       image: "https://images.unsplash.com/photo-1580979018577-7049782d6595?w=800",
     },
     {
@@ -31,6 +33,7 @@ const Reports = () => {
       location: "Elm Street",
       date: "2024-03-13",
       status: "resolved" as const,
+      priority: "low",
       image: "https://images.unsplash.com/photo-1620800259021-93b1bfbc0e2c?w=800",
     },
     {
@@ -40,6 +43,7 @@ const Reports = () => {
       location: "Washington Boulevard",
       date: "2024-03-12",
       status: "pending" as const,
+      priority: "medium",
     },
   ];
 
