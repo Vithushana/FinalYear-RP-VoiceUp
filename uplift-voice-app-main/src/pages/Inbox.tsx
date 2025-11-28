@@ -1,51 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import Sidebar from '@/components/layout/Sidebar';
-import { Bell, Search, User, AlertTriangle, Mail } from 'lucide-react';
-import ApiService, { Issue } from '@/services/ApiService';
-import StatusProgression from '@/components/StatusProgression';
-import { getStatusColor } from '@/utils/statusProgression';
-import { getPriorityBorderColor } from '@/utils/priorityColors';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import Sidebar from "@/components/layout/Sidebar";
+import { Bell, Search, User, Mail } from "lucide-react";
+import ApiService, { Issue } from "@/services/ApiService";
+import StatusProgression from "@/components/StatusProgression";
+import { getStatusColor } from "@/utils/statusProgression";
+import { getPriorityBorderColor } from "@/utils/priorityColors";
 
 const Inbox: React.FC = () => {
-  const [issues, setIssues] = useState([
-    {
-      id: "1",
-      title: "Inbox Road Crack",
-      description: "A road crack near the town center has been reported and is awaiting verification.",
-      location: "Town Center, Colombo",
-      category: "Road Crack",
-      status: "Seen",
-      priority: "2",
-      dateCreated: "2025-07-28",
-    },
-    {
-      id: "2",
-      title: "Inbox Pothole",
-      description: "Potholes on the main road have been reported and are awaiting verification.",
-      location: "Main Road, Colombo",
-      category: "Pothole",
-      status: "Seen",
-      priority: "1",
-      dateCreated: "2025-07-29",
-    },
-  ]);
+  const [issues, setIssues] = useState<Issue[]>([]); // ✅ use Issue type
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState<string>(""); // ✅ dynamic logged-in name
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchIssues();
+
+    // ✅ Load logged-in user from localStorage
+    const storedUser = localStorage.getItem("auth_user");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        // tune this based on your actual user object
+        setUserName(
+          user.name || user.fullName || user.username || user.email || "Owner"
+        );
+      } catch (e) {
+        console.error("Error parsing auth_user:", e);
+      }
+    }
   }, []);
 
   const fetchIssues = async () => {
     try {
       setLoading(true);
-      const data = await ApiService.getIssues(50, 0, 'Seen');
+      const data = await ApiService.getIssues(50, 0, "Seen");
       setIssues(data);
     } catch (error) {
-      console.error('Error fetching inbox issues:', error);
+      console.error("Error fetching inbox issues:", error);
     } finally {
       setLoading(false);
     }
@@ -57,7 +51,7 @@ const Inbox: React.FC = () => {
       // Refresh the issues list after status update
       fetchIssues();
     } catch (error) {
-      console.error('Error updating issue status:', error);
+      console.error("Error updating issue status:", error);
     }
   };
 
@@ -75,11 +69,12 @@ const Inbox: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <Sidebar />
-      
+
       <div className="flex-1">
+        {/* Header */}
         <div className="bg-white border-b p-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-800">Inbox</h1>
-          
+
           <div className="flex items-center gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -96,78 +91,112 @@ const Inbox: React.FC = () => {
               <User className="w-5 h-5" />
             </Button>
             <span className="bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-              Ranjan
+              {userName || "Owner"}
             </span>
           </div>
         </div>
 
+        {/* Content */}
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {issues.map((issue, index) => {
               const inboxImages = [
-                '/images/image 15 (2).png',
-                '/images/image 16 (1).png',
-                '/images/image 17 (1).png',
-                '/images/Rectangle 25.png',
-                '/images/Groups (1).png',
-                '/images/image 13 (1).png',
-                '/images/image 13 (2).png',
-                '/images/image 14 (1).png'
+                "/images/image 15 (2).png",
+                "/images/image 16 (1).png",
+                "/images/image 17 (1).png",
+                "/images/Rectangle 25.png",
+                "/images/Groups (1).png",
+                "/images/image 13 (1).png",
+                "/images/image 13 (2).png",
+                "/images/image 14 (1).png",
               ];
+
               return (
-              <Card key={issue._id} className={`bg-white border-2 ${getPriorityBorderColor(issue.priority)} hover:shadow-lg transition-shadow h-full`}>
-                <CardContent className="p-4 h-full flex flex-col">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                      <Mail className="w-4 h-4 text-white" />
+                <Card
+                  key={issue._id}
+                  className={`bg-white border-2 ${getPriorityBorderColor(
+                    issue.priority
+                  )} hover:shadow-lg transition-shadow h-full`}
+                >
+                  <CardContent className="p-4 h-full flex flex-col">
+                    {/* Reporter + icon */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                        <Mail className="w-4 h-4 text-white" />
+                      </div>
+                      <span className="font-medium text-gray-700">
+                        @{issue.userName || "Citizen"}
+                      </span>
                     </div>
-                    <span className="font-medium text-gray-700">@{issue.userName || 'Albert'}</span>
-                  </div>
 
-                  <div className="mb-3">
-                    <img
-                      src={issue.userUploadImages?.[0] || inboxImages[index % inboxImages.length]}
-                      alt={issue.title}
-                      className="w-full h-40 object-cover rounded-lg"
-                    />
-                  </div>
-
-                  <div className="mb-4 flex-grow">
-                    <p className="text-sm text-gray-600 mb-2 line-clamp-3">
-                      {issue.description}
-                    </p>
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <div><span className="font-medium">Type:</span> {issue.category}</div>
-                      <div><span className="font-medium">Location:</span> {issue.location}</div>
-                      <div><span className="font-medium">Posted:</span> {new Date(issue.dateCreated).toLocaleDateString()}</div>
+                    {/* Image */}
+                    <div className="mb-3">
+                      <img
+                        src={
+                          issue.userUploadImages?.[0] ||
+                          inboxImages[index % inboxImages.length]
+                        }
+                        alt={issue.title}
+                        className="w-full h-40 object-cover rounded-lg"
+                      />
                     </div>
-                  </div>
 
-                  <div className="mb-3 mt-auto">
-                    <StatusProgression
-                      currentStatus={issue.status}
-                      issueId={issue._id}
-                      onStatusUpdate={(newStatus) => handleStatusUpdate(issue._id, newStatus)}
-                    />
-                  </div>
+                    {/* Text + meta */}
+                    <div className="mb-4 flex-grow">
+                      <p className="text-sm text-gray-600 mb-2 line-clamp-3">
+                        {issue.description}
+                      </p>
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <div>
+                          <span className="font-medium">Type:</span>{" "}
+                          {issue.category}
+                        </div>
+                        <div>
+                          <span className="font-medium">Location:</span>{" "}
+                          {issue.location}
+                        </div>
+                        <div>
+                          <span className="font-medium">Posted:</span>{" "}
+                          {issue.dateCreated
+                            ? new Date(
+                                issue.dateCreated
+                              ).toLocaleDateString()
+                            : "-"}
+                        </div>
+                      </div>
+                    </div>
 
-                  <div className="flex items-center justify-end">
-                    <Button
-                      onClick={() => navigate(`/issue/${issue._id}`)}
-                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 text-sm rounded-md"
-                    >
-                      details
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                    {/* Status progression */}
+                    <div className="mb-3 mt-auto">
+                      <StatusProgression
+                        currentStatus={issue.status}
+                        issueId={issue._id}
+                        onStatusUpdate={(newStatus) =>
+                          handleStatusUpdate(issue._id, newStatus)
+                        }
+                      />
+                    </div>
+
+                    {/* Details button */}
+                    <div className="flex items-center justify-end">
+                      <Button
+                        onClick={() => navigate(`/issue/${issue._id}`)}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1 text-sm rounded-md"
+                      >
+                        details
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
 
           {issues.length === 0 && (
             <div className="text-center py-12">
-              <div className="text-gray-500 text-lg">No issues in inbox found</div>
+              <div className="text-gray-500 text-lg">
+                No issues in inbox found
+              </div>
             </div>
           )}
         </div>
