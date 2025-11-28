@@ -3,33 +3,46 @@ import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Calendar } from "lucide-react";
+import { getPriorityBorderColor } from "@/utils/priorityColors";
 
 const MapView = () => {
   // Mock data for reported issues
   const reportedIssues = [
     {
-      id: 1,
+      id: "1",
+      _id: "1",
       title: "Large pothole on Main Street",
       location: "Main Street & Oak Avenue",
       date: "2024-03-15",
-      status: "verified",
+      status: "Verified",
+      priority: "critical",
       coordinates: { lat: 40.7128, lng: -74.0060 },
+      description: "Deep pothole causing traffic hazards near the intersection with Oak Avenue. Approximately 2 feet wide and 6 inches deep.",
+      image: "/images/image1.png",
     },
     {
-      id: 2,
+      id: "2",
+      _id: "2",
       title: "Broken traffic light",
       location: "5th Street & Park Avenue",
       date: "2024-03-14",
-      status: "under-review",
+      status: "On Hold",
+      priority: "medium",
       coordinates: { lat: 40.7580, lng: -73.9855 },
+      description: "Traffic signal not functioning at busy intersection, causing confusion and safety concerns.",
+      image: "/images/image2.png",
     },
     {
-      id: 3,
+      id: "3",
+      _id: "3",
       title: "Damaged road sign",
       location: "Elm Street",
       date: "2024-03-13",
-      status: "resolved",
+      status: "Resolved",
+      priority: "low",
       coordinates: { lat: 40.7589, lng: -73.9851 },
+      description: "Stop sign completely bent and unreadable after accident.",
+      image: "/images/image3.png",
     },
   ];
 
@@ -87,7 +100,7 @@ const MapView = () => {
                   {reportedIssues.map((issue) => (
                     <div
                       key={issue.id}
-                      className="p-4 rounded-lg border hover:border-primary transition-colors cursor-pointer"
+                      className={`p-4 rounded-lg border-2 ${getPriorityBorderColor(issue.priority)} hover:border-primary transition-colors cursor-pointer`}
                     >
                       <div className="flex items-start gap-3 mb-3">
                         <MapPin className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
@@ -112,7 +125,12 @@ const MapView = () => {
                               : "secondary"
                           }
                         >
-                          {statusConfig[issue.status as keyof typeof statusConfig].label}
+                          <div className="text-center w-full">
+                            {
+                              statusConfig[issue.status as keyof typeof statusConfig]
+                                .label
+                            }
+                          </div>
                         </Badge>
                       </div>
                     </div>

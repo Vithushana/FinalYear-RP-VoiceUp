@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Calendar, MapPin } from "lucide-react";
+import { getPriorityBorderColor } from "@/utils/priorityColors";
 
 interface ReportCardProps {
   id: string;
@@ -9,6 +10,7 @@ interface ReportCardProps {
   location: string;
   date: string;
   status: "pending" | "under-review" | "verified" | "rejected" | "resolved";
+  priority?: string;
   image?: string;
 }
 
@@ -26,12 +28,13 @@ export const ReportCard = ({
   location,
   date,
   status,
+  priority,
   image,
 }: ReportCardProps) => {
   const { label, variant } = statusConfig[status];
 
   return (
-    <Card className="overflow-hidden hover:shadow-medium transition-smooth">
+    <Card className={`overflow-hidden hover:shadow-medium transition-smooth border-2 ${getPriorityBorderColor(priority || 'low')}`}>
       {image && (
         <div className="aspect-video w-full overflow-hidden bg-muted">
           <img
@@ -42,26 +45,22 @@ export const ReportCard = ({
         </div>
       )}
       <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-lg line-clamp-2">{title}</h3>
-          <Badge variant={variant}>{label}</Badge>
-        </div>
+        <h3 className="text-lg font-semibold">{title}</h3>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
-          {description}
-        </p>
-        <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            <span className="line-clamp-1">{location}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            <span>{date}</span>
-          </div>
+        <p>{description}</p>
+        <div className="flex items-center gap-2 mt-2">
+          <MapPin className="w-4 h-4 text-gray-500" />
+          <span>{location}</span>
+        </div>
+        <div className="flex items-center gap-2 mt-2">
+          <Calendar className="w-4 h-4 text-gray-500" />
+          <span>{date}</span>
         </div>
       </CardContent>
+      <CardFooter>
+        <Badge variant={variant}>{label}</Badge>
+      </CardFooter>
     </Card>
   );
 };
