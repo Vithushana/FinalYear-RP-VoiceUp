@@ -53,9 +53,24 @@ const Achievements = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState<string>(''); // ✅ dynamic user name
 
   useEffect(() => {
     fetchAchievements();
+
+    // ✅ Load logged-in user from localStorage
+    const storedUser = localStorage.getItem('auth_user');
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        // tweak keys based on your backend user object
+        setUserName(
+          user.name || user.fullName || user.username || user.email || 'Owner'
+        );
+      } catch (e) {
+        console.error('Error parsing auth_user:', e);
+      }
+    }
   }, []);
 
   const fetchAchievements = async () => {
@@ -321,7 +336,7 @@ const Achievements = () => {
                 <User className="h-5 w-5" />
               </Button>
               <span className="bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                Ranjan
+                {userName || 'Owner'}
               </span>
             </div>
           </div>
