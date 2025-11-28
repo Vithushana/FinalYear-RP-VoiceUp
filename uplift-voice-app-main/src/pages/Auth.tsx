@@ -30,57 +30,96 @@ const positionData = {
 const getProvinces = () => Object.keys(positionData);
 
 /* ---------------- Position Modal ---------------- */
-const PositionModal = ({ onClose, onSelect }: { onClose: () => void; onSelect: (val: string) => void }) => {
-  const [selections, setSelections] = useState({ province: "", district: "", region: "", designation: "" });
+const PositionModal = ({
+  onClose,
+  onSelect,
+}: {
+  onClose: () => void;
+  onSelect: (val: string) => void;
+}) => {
+  const [selections, setSelections] = useState({
+    province: "",
+    district: "",
+    region: "",
+    designation: "",
+  });
 
-  const districts = selections.province ? Object.keys(positionData[selections.province]) : [];
+  const districts = selections.province
+    ? Object.keys(positionData[selections.province])
+    : [];
   const regions =
-    selections.province && selections.district ? Object.keys(positionData[selections.province][selections.district]) : [];
+    selections.province && selections.district
+      ? Object.keys(
+          positionData[selections.province][selections.district]
+        )
+      : [];
   const designations =
-    selections.province && selections.district && selections.region
-      ? positionData[selections.province][selections.district][selections.region]
+    selections.province &&
+    selections.district &&
+    selections.region
+      ? positionData[selections.province][selections.district][
+          selections.region
+        ]
       : [];
 
   const handleSelectChange = (name: string, value: string) => {
     setSelections((prev) => {
       let next = { ...prev, [name]: value };
-      if (name === "province") next = { ...next, district: "", region: "", designation: "" };
-      if (name === "district") next = { ...next, region: "", designation: "" };
+      if (name === "province")
+        next = { ...next, district: "", region: "", designation: "" };
+      if (name === "district")
+        next = { ...next, region: "", designation: "" };
       if (name === "region") next = { ...next, designation: "" };
       return next;
     });
   };
 
   const handleConfirm = () => {
-    if (!selections.designation) return alert("Please select a Designation.");
-    onSelect(`${selections.designation} (${selections.province}, ${selections.district})`);
+    if (!selections.designation)
+      return alert("Please select a Designation.");
+    onSelect(
+      `${selections.designation} (${selections.province}, ${selections.district})`
+    );
   };
 
   const isComplete = selections.designation !== "";
 
   return (
-    <div className="fixed inset-0 z-50 bg-gray-900/50 flex items-center justify-center p-3" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 bg-gray-900/50 flex items-center justify-center p-3"
+      onClick={onClose}
+    >
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-md"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-[#1A4776]">Select Position Details</h3>
+          <h3 className="text-lg font-semibold text-[#1A4776]">
+            Select Position Details
+          </h3>
         </div>
 
         <div className="p-5 space-y-3">
           <div>
-            <Label htmlFor="modal-province" className="text-sm">Province</Label>
+            <Label htmlFor="modal-province" className="text-sm">
+              Province
+            </Label>
             <div className="relative">
               <select
                 id="modal-province"
                 value={selections.province}
-                onChange={(e) => handleSelectChange("province", e.target.value)}
+                onChange={(e) =>
+                  handleSelectChange("province", e.target.value)
+                }
                 className="appearance-none h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:ring-2 focus-visible:ring-blue-500"
               >
-                <option value="" disabled>Select Province</option>
+                <option value="" disabled>
+                  Select Province
+                </option>
                 {getProvinces().map((p) => (
-                  <option key={p} value={p}>{p}</option>
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
                 ))}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
@@ -88,18 +127,26 @@ const PositionModal = ({ onClose, onSelect }: { onClose: () => void; onSelect: (
           </div>
 
           <div>
-            <Label htmlFor="modal-district" className="text-sm">District</Label>
+            <Label htmlFor="modal-district" className="text-sm">
+              District
+            </Label>
             <div className="relative">
               <select
                 id="modal-district"
                 value={selections.district}
-                onChange={(e) => handleSelectChange("district", e.target.value)}
+                onChange={(e) =>
+                  handleSelectChange("district", e.target.value)
+                }
                 disabled={!selections.province}
                 className="appearance-none h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
               >
-                <option value="" disabled>Select District</option>
+                <option value="" disabled>
+                  Select District
+                </option>
                 {districts.map((d) => (
-                  <option key={d} value={d}>{d}</option>
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
                 ))}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
@@ -107,18 +154,26 @@ const PositionModal = ({ onClose, onSelect }: { onClose: () => void; onSelect: (
           </div>
 
           <div>
-            <Label htmlFor="modal-region" className="text-sm">Region</Label>
+            <Label htmlFor="modal-region" className="text-sm">
+              Region
+            </Label>
             <div className="relative">
               <select
                 id="modal-region"
                 value={selections.region}
-                onChange={(e) => handleSelectChange("region", e.target.value)}
+                onChange={(e) =>
+                  handleSelectChange("region", e.target.value)
+                }
                 disabled={!selections.district}
                 className="appearance-none h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
               >
-                <option value="" disabled>Select Region</option>
+                <option value="" disabled>
+                  Select Region
+                </option>
                 {regions.map((r) => (
-                  <option key={r} value={r}>{r}</option>
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
                 ))}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
@@ -126,18 +181,26 @@ const PositionModal = ({ onClose, onSelect }: { onClose: () => void; onSelect: (
           </div>
 
           <div>
-            <Label htmlFor="modal-designation" className="text-sm">Designation</Label>
+            <Label htmlFor="modal-designation" className="text-sm">
+              Designation
+            </Label>
             <div className="relative">
               <select
                 id="modal-designation"
                 value={selections.designation}
-                onChange={(e) => handleSelectChange("designation", e.target.value)}
+                onChange={(e) =>
+                  handleSelectChange("designation", e.target.value)
+                }
                 disabled={!selections.region}
                 className="appearance-none h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50"
               >
-                <option value="" disabled>Select Designation</option>
+                <option value="" disabled>
+                  Select Designation
+                </option>
                 {designations.map((d) => (
-                  <option key={d} value={d}>{d}</option>
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
                 ))}
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
@@ -150,7 +213,9 @@ const PositionModal = ({ onClose, onSelect }: { onClose: () => void; onSelect: (
             type="button"
             onClick={handleConfirm}
             disabled={!isComplete}
-            className={`h-9 px-4 bg-gradient-to-r from-[#1A4776] to-[#1688DF] text-white ${!isComplete ? "opacity-50 cursor-not-allowed" : "shadow-sm"}`}
+            className={`h-9 px-4 bg-gradient-to-r from-[#1A4776] to-[#1688DF] text-white ${
+              !isComplete ? "opacity-50 cursor-not-allowed" : "shadow-sm"
+            }`}
           >
             OK
           </Button>
@@ -172,10 +237,15 @@ const Auth: React.FC = () => {
         VOICE UP
       </h1>
       <p className="text-base max-w-md leading-relaxed bg-clip-text text-transparent bg-gradient-to-r from-[#1A4776] to-[#1688DF]">
-        Empowering you to serve better — we streamline your tasks and relay every citizen&apos;s voice directly to you
+        Empowering you to serve better — we streamline your tasks and relay
+        every citizen&apos;s voice directly to you
       </p>
       <div className="mt-4 w-full">
-        <img src="/img.png" alt="Voice Up" className="mx-auto max-w-full h-auto object-contain" />
+        <img
+          src="/img.png"
+          alt="Voice Up"
+          className="mx-auto max-w-full h-auto object-contain"
+        />
       </div>
     </div>
   );
@@ -190,7 +260,9 @@ const Auth: React.FC = () => {
             <button
               onClick={() => setTab("login")}
               className={`flex-1 h-9 rounded-md text-sm font-medium transition ${
-                tab === "login" ? "bg-white shadow text-[#1A4776]" : "text-gray-600"
+                tab === "login"
+                  ? "bg-white shadow text-[#1A4776]"
+                  : "text-gray-600"
               }`}
             >
               <span className="inline-flex items-center justify-center gap-2 h-full">
@@ -200,7 +272,9 @@ const Auth: React.FC = () => {
             <button
               onClick={() => setTab("signup")}
               className={`flex-1 h-9 rounded-md text-sm font-medium transition ${
-                tab === "signup" ? "bg-white shadow text-[#1688DF]" : "text-gray-600"
+                tab === "signup"
+                  ? "bg-white shadow text-[#1688DF]"
+                  : "text-gray-600"
               }`}
             >
               <span className="inline-flex items-center justify-center gap-2 h-full">
@@ -222,7 +296,7 @@ const Auth: React.FC = () => {
 
 export default Auth;
 
-/* ---------------- Login Form (compact, no placeholders) ---------------- */
+/* ---------------- Login Form (compact, basic validation) ---------------- */
 const LoginForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -234,7 +308,11 @@ const LoginForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
     setErr("");
     setLoading(true);
     try {
-      const res = await postJSON<{ ok: boolean; token: string; user: any }>("/api/auth/login", { email, password });
+      const res = await postJSON<{
+        ok: boolean;
+        token: string;
+        user: any;
+      }>("/api/auth/login", { email, password });
       localStorage.setItem("auth_token", res.token);
       onSuccess();
     } catch (e: any) {
@@ -251,7 +329,9 @@ const LoginForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
       </h2>
 
       <div className="space-y-1">
-        <Label htmlFor="login-email" className="text-sm">Email</Label>
+        <Label htmlFor="login-email" className="text-sm">
+          Email
+        </Label>
         <Input
           id="login-email"
           type="email"
@@ -263,7 +343,9 @@ const LoginForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="login-pass" className="text-sm">Password</Label>
+        <Label htmlFor="login-pass" className="text-sm">
+          Password
+        </Label>
         <Input
           id="login-pass"
           type="password"
@@ -274,16 +356,30 @@ const LoginForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
         />
       </div>
 
-      {err && <div className="text-xs bg-red-100 text-red-700 p-2 rounded">{err}</div>}
+      {err && (
+        <div className="text-xs bg-red-100 text-red-700 p-2 rounded">
+          {err}
+        </div>
+      )}
 
-      <Button type="submit" disabled={loading} className="h-9 w-full bg-gradient-to-r from-[#1A4776] to-[#1688DF] text-white">
-        {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</>) : ("Log In")}
+      <Button
+        type="submit"
+        disabled={loading}
+        className="h-9 w-full bg-gradient-to-r from-[#1A4776] to-[#1688DF] text-white"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…
+          </>
+        ) : (
+          "Log In"
+        )}
       </Button>
     </form>
   );
 };
 
-/* ---------------- Signup Form (compact, no placeholders) ---------------- */
+/* ---------------- Signup Form (with basic validation) ---------------- */
 const SignupForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -299,19 +395,70 @@ const SignupForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
     securityCode: "",
   });
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+    setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Name is required.";
+    }
+
+    if (
+      !formData.position ||
+      formData.position === "Select your position details"
+    ) {
+      newErrors.position = "Please select your position.";
+    }
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Phone number is required.";
+    } else if (!/^\d{10}$/.test(formData.phone.trim())) {
+      newErrors.phone = "Enter a valid 10-digit phone number.";
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      newErrors.email = "Enter a valid email address.";
+    }
+
+    if (!formData.password) {
+      newErrors.password = "Password is required.";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters.";
+    }
+
+    if (!formData.securityCode.trim()) {
+      newErrors.securityCode = "Security code is required.";
+    }
+
+    if (!formData.agreed) {
+      newErrors.agreed = "You must agree to all the statements.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.agreed) {
-      setMessage("You must agree to all statements to sign up.");
+    setMessage("");
+
+    if (!validate()) {
       return;
     }
+
     setIsSubmitting(true);
-    setMessage("");
     try {
       await postJSON<{ ok: boolean; message: string }>("/api/auth/signup", {
         name: formData.name,
@@ -336,8 +483,20 @@ const SignupForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
       </h2>
 
       <div className="space-y-0">
-        <Label htmlFor="name" className="text-sm">Your Name</Label>
-        <Input id="name" name="name" value={formData.name} onChange={handleChange} className="h-9 text-sm" required />
+        <Label htmlFor="name" className="text-sm">
+          Your Name
+        </Label>
+        <Input
+          id="name"
+          name="name"
+          value={formData.name}
+          onChange={handleChange}
+          className="h-9 text-sm"
+          required
+        />
+        {errors.name && (
+          <p className="text-xs text-red-600 mt-1">{errors.name}</p>
+        )}
       </div>
 
       <div className="space-y-0">
@@ -347,49 +506,138 @@ const SignupForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
           onClick={() => setIsModalOpen(true)}
           className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-left text-sm focus-visible:ring-2 focus-visible:ring-blue-500"
         >
-          <span className={formData.position ? "text-gray-900" : "text-gray-500"}>
+          <span
+            className={
+              formData.position &&
+              formData.position !== "Select your position details"
+                ? "text-gray-900"
+                : "text-gray-500"
+            }
+          >
             {formData.position || "Select Designation"}
           </span>
         </button>
+        {errors.position && (
+          <p className="text-xs text-red-600 mt-1">{errors.position}</p>
+        )}
       </div>
 
       <div className="space-y-0">
-        <Label htmlFor="phone" className="text-sm">Phone Number</Label>
-        <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleChange} className="h-9 text-sm" required />
+        <Label htmlFor="phone" className="text-sm">
+          Phone Number
+        </Label>
+        <Input
+          id="phone"
+          name="phone"
+          type="tel"
+          value={formData.phone}
+          onChange={handleChange}
+          className="h-9 text-sm"
+          required
+        />
+        {errors.phone && (
+          <p className="text-xs text-red-600 mt-1">{errors.phone}</p>
+        )}
       </div>
 
       <div className="space-y-0">
-        <Label htmlFor="email" className="text-sm">Email</Label>
-        <Input id="email" name="email" type="email" value={formData.email} onChange={handleChange} className="h-9 text-sm" required />
+        <Label htmlFor="email" className="text-sm">
+          Email
+        </Label>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          value={formData.email}
+          onChange={handleChange}
+          className="h-9 text-sm"
+          required
+        />
+        {errors.email && (
+          <p className="text-xs text-red-600 mt-1">{errors.email}</p>
+        )}
       </div>
 
       <div className="space-y-0">
-        <Label htmlFor="password" className="text-sm">Password</Label>
-        <Input id="password" name="password" type="password" value={formData.password} onChange={handleChange} className="h-9 text-sm" required />
+        <Label htmlFor="password" className="text-sm">
+          Password
+        </Label>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          value={formData.password}
+          onChange={handleChange}
+          className="h-9 text-sm"
+          required
+        />
+        {errors.password && (
+          <p className="text-xs text-red-600 mt-1">{errors.password}</p>
+        )}
       </div>
 
       <div className="space-y-0">
-        <Label htmlFor="securityCode" className="text-sm">Security Code</Label>
-        <Input id="securityCode" name="securityCode" value={formData.securityCode} onChange={handleChange} className="h-9 text-sm" required />
+        <Label htmlFor="securityCode" className="text-sm">
+          Security Code
+        </Label>
+        <Input
+          id="securityCode"
+          name="securityCode"
+          value={formData.securityCode}
+          onChange={handleChange}
+          className="h-9 text-sm"
+          required
+        />
+        {errors.securityCode && (
+          <p className="text-xs text-red-600 mt-1">
+            {errors.securityCode}
+          </p>
+        )}
       </div>
 
       <label className="flex items-center gap-2">
         <Checkbox
           id="agreed"
           checked={formData.agreed}
-          onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, agreed: Boolean(checked) }))}
+          onCheckedChange={(checked) =>
+            setFormData((prev) => ({
+              ...prev,
+              agreed: Boolean(checked),
+            }))
+          }
         />
-        <span className="text-sm text-gray-700">I agree to all the statements</span>
+        <span className="text-sm text-gray-700">
+          I agree to all the statements
+        </span>
       </label>
+      {errors.agreed && (
+        <p className="text-xs text-red-600 mt-1">{errors.agreed}</p>
+      )}
 
       {message && (
-        <div className={`p-2 rounded text-xs ${message.includes("successfully") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+        <div
+          className={`p-2 rounded text-xs ${
+            message.includes("successfully")
+              ? "bg-green-100 text-green-700"
+              : "bg-red-100 text-red-700"
+          }`}
+        >
           {message}
         </div>
       )}
 
-      <Button type="submit" disabled={isSubmitting} className="h-9 w-full bg-gradient-to-r from-[#1A4776] to-[#1688DF] text-white">
-        {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating…</>) : ("Sign Up")}
+      <Button
+        type="submit"
+        disabled={isSubmitting}
+        className="h-9 w-full bg-gradient-to-r from-[#1A4776] to-[#1688DF] text-white"
+      >
+        {isSubmitting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating…
+          </>
+        ) : (
+          "Sign Up"
+        )}
       </Button>
 
       {isModalOpen && (
@@ -398,6 +646,7 @@ const SignupForm: React.FC<{ onSuccess: () => void }> = ({ onSuccess }) => {
           onSelect={(val) => {
             setFormData((p) => ({ ...p, position: val }));
             setIsModalOpen(false);
+            setErrors((prev) => ({ ...prev, position: "" }));
           }}
         />
       )}
