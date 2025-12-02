@@ -23,15 +23,11 @@ wheels/
 .installed.cfg
 *.egg
 
-# Large ML Model Files (Upload to Google Drive instead)
-*.pt
-*.pth
-*.onnx
+# Large ML Model Files - Now using Git LFS
+# *.pt, *.h5, *.keras tracked by Git LFS (see .gitattributes)
 *.bin
-*.h5
 *.pb
 *.tflite
-models/
 road_full/
 road_parallel/
 garbage-results/
