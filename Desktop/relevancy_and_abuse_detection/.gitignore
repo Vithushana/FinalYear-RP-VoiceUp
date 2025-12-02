@@ -1,0 +1,74 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Large ML Model Files (Upload to Google Drive instead)
+*.pt
+*.pth
+*.onnx
+*.bin
+*.h5
+*.pb
+*.tflite
+models/
+road_full/
+road_parallel/
+garbage-results/
+
+# Datasets (Too large for Git)
+*.zip
+road_ultimate_dataset/
+road_parallel_datasets_labeled/
+train/
+val/
+test/
+
+# Environment
+.env
+.env.local
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Uploads folder
+uploads/
+temp/
+
+# Training outputs
+runs/
+results/
+wandb/
