@@ -47,27 +47,8 @@ abuse_model = None
 privacy_model = None
 distilbert_pipeline = None
 
-# Load auxiliary road detection models for ensemble
-road_models = []
-
-# Auxiliary model ensemble paths (trained on diverse road datasets)
-auxiliary_model_paths = [
-    "models/road_detection_ultimate/training/weights/best.pt",
-    "models/road_detection_model.pt"
-]
-
-for model_path in auxiliary_model_paths:
-    if os.path.exists(model_path):
-        model = YOLO(model_path)
-        road_models.append(model)
-        print(f"✅ Loaded road model: {model_path}")
-    else:
-        print(f"❌ Road model not found: {model_path}")
-
-print(f"📊 Road Detection Status: {len(road_models)}/{len(auxiliary_model_paths)} models loaded")
-
 try:
-    # Load enhanced road detection system with multiple trained models
+    # Load enhanced road detection system with 8 trained models
     enhanced_road_detector = EnhancedRoadDetectionSystem()
     print("✅ Enhanced road detection system loaded (8 models)")
 except Exception as e:
@@ -431,9 +412,9 @@ def analyze_text_with_ai(text):
 def analyze_content(image_data, description):
     """
     Updated HARISH'S RELEVANCE AND ABUSE FILTERATION SYSTEM
-    Combines predictions from all road models for better accuracy.
+    Uses 8-model enhanced road detection system for better accuracy.
     """
-    global road_models, abuse_model, enhanced_road_detector, abuse_model_main, abuse_models_sub
+    global abuse_model, enhanced_road_detector, abuse_model_main, abuse_models_sub
 
     # Decode image
     try:
