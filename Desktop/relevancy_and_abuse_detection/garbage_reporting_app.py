@@ -680,307 +680,20 @@ def analyze_content(image_data, description):
     if is_document:
         print(f"🛑 BLOCKED: {document_reason}")
     
-    # ================ PHASE 1: ML-POWERED ROAD RELEVANCE CHECK ================
-    # Using YOUR TRAINED YOLO MODEL for accurate road detection!
+    # ================ PHASE 1: SKIP ROAD DETECTION (Garbage App) ================
+    # NOTE: This garbage reporting app does NOT check for road relevance
+    # Only checking: Privacy (humans) + Image Abuse + Text Abuse + Garbage Detection
     
-    # Initialize all variables at the beginning to prevent scope issues
-    is_road_image = False
-    relevance_reason = ""
-    ml_confidence = 0.0
-    # is_document already initialized in Phase 0.5
-    image_abuse_flags = []
+    print("ℹ️ Road detection skipped (garbage app)")
+    
+    # Initialize variables needed by other phases
     image_abuse_flags = []
     image_abuse_confidence = 0.0
     text_abuse_flags = []
     has_image_abuse = False
     has_text_abuse = False
-    relevance_passed = False
     image_abuse_detected = False
     text_abuse_detected = False
-    ai_road_decision_made = False  # Track if ML model made a decision
-    
-    # PRIMARY: Use enhanced road detection system (8 trained models)
-    if not is_document and enhanced_road_detector is not None:
-        try:
-            # Run enhanced road detection with optimized confidence threshold for maximum coverage
-            road_results = enhanced_road_detector.detect_roads_enhanced(img_color, confidence_threshold=0.15)
-            
-            # FIX: Only use ML result if confidence is decent (>50%), otherwise apply parameter validation
-            # This handles cases where a weak model detects "something" with low confidence requiring secondary validation
-            high_conf_detection = False
-            if road_results["roads_detected"]:
-                max_conf = max([d["confidence"] for d in road_results["detections"]])
-                if max_conf > 0.50:
-                    high_conf_detection = True
-            
-            if high_conf_detection:
-                # Get the best detection from enhanced results
-                best_detection = max(road_results["detections"], key=lambda x: x["confidence"])
-                best_confidence = best_detection["confidence"]
-                best_class = 0  # Road class
-                
-                # Use enhanced class names
-                class_names = {0: 'road', 1: 'non-road'}
-                predicted_class = class_names.get(best_class, f'class_{best_class}')
-                
-                ml_confidence = float(best_confidence)
-                
-                # STRICT Road detection logic with higher confidence requirements
-                if 'road' in predicted_class.lower() or best_class == 0:  # Assuming class 0 is road
-                    # Model confidence threshold set to 0.50 (validated on test set)
-                    if best_confidence >= 0.50:
-                        # ENHANCED VALIDATION: Additional checks for false positives
-                        hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
-                        
-                        # Check for excessive green vegetation (bushes/nature)
-                        # Green in HSV: Hue 35-85, Saturation 40-255, Value 40-255
-                        green_mask = cv2.inRange(hsv, np.array([35, 40, 40]), np.array([85, 255, 255]))
-                        green_percentage = np.sum(green_mask > 0) / (height * width) * 100
-                        
-                        # Check for road-like linear features
-                        edges = cv2.Canny(img_gray, 50, 150)
-                        edge_density = np.sum(edges > 0) / (height * width)
-                        
-                        # Detect straight lines (roads have long straight edges)
-                        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=100, minLineLength=width//4, maxLineGap=20)
-                        has_linear_features = lines is not None and len(lines) > 5
-                        
-                        # Calculate other metrics for validation
-                        # Histogram analysis for diagrams/synthetic images
-                        hist = cv2.calcHist([img_gray], [0], None, [256], [0, 256])
-                        hist_norm = hist / (height * width)
-                        top_5_sum = np.sum(np.sort(hist_norm.flatten())[-5:])
-                        
-                        # Texture check (variance of Laplacian) - Real roads have texture, diagrams are flat
-                        laplacian_var = cv2.Laplacian(img_gray, cv2.CV_64F).var()
-                        
-                        # VALIDATION CHAIN: Check for various rejection criteria
-                        # REJECT if it's mostly vegetation without road features
-                        if green_percentage > 60 and not has_linear_features:
-                            is_road_image = False
-                            relevance_reason = f"ML Model: {predicted_class} detected ({best_confidence:.2f}) but image is pure vegetation - NOT a road"
-                            print(f"🚫 Road detection overridden: Pure vegetation detected ({green_percentage:.1f}%)")
-                        # NOTE: Removed human detection override - road model should show results regardless
-                        # REJECT if too synthetic/uniform
-                        elif top_5_sum > 0.35:
-                            is_road_image = False
-                            relevance_reason = f"ML Model: {predicted_class} detected ({best_confidence:.2f}) but image looks synthetic (uniform background) - NOT road relevant"
-                            print(f"🚫 Road detection overridden: Synthetic/Uniform image detected (Top 5 colors: {top_5_sum*100:.1f}%)")
-                        # REJECT if too flat (low texture)
-                        elif laplacian_var < 50:
-                            is_road_image = False
-                            relevance_reason = f"ML Model: {predicted_class} detected ({best_confidence:.2f}) but image is too flat/synthetic - NOT road relevant"
-                            print(f"🚫 Road detection overridden: Low texture variance ({laplacian_var:.1f})")
-                        # ACCEPT - passed all validation checks
-                        else:
-                            is_road_image = True
-                            relevance_reason = f"ML Model: {predicted_class} detected (confidence: {best_confidence:.2f}) - VALIDATED"
-                            # Note: Show validation without mentioning humans - they're handled separately in final decision
-                            print(f"✅ Road detection validated: {best_confidence:.2f}")
-                    else:
-                        is_road_image = False
-                        relevance_reason = f"ML Model: {predicted_class} confidence too low ({best_confidence:.2f} < 50%)"
-                        print(f"⚪ Road detection rejected: Low confidence {best_confidence:.2f}")
-                else:
-                    is_road_image = False
-                    relevance_reason = f"ML Model: {predicted_class} detected - not road relevant"
-            else:
-                # No objects detected OR confidence too low - apply parameter validation layer
-                print("🤔 No strong ML detections (>50%) - applying learned parameter thresholds...")
-                
-                # Parameter validation: Apply trained visual feature thresholds
-                gray = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
-                
-                # Check for linear features (road markings, edges)
-                edges = cv2.Canny(gray, 50, 150)
-                edge_density = np.sum(edges > 0) / (height * width)
-                
-                # Reject high edge density (typical of text/screenshots)
-                # Edge density parameter: 0.35 threshold allows textured surfaces (learned from gravel/pothole training examples)
-                if edge_density > 0.35:
-                    is_road_image = False
-                    relevance_reason = f"Parameter Validation: Edge density {edge_density:.2f} exceeds trained threshold - classified as non-road"
-                    print(f"🚫 Parameter validation rejected: High edge density {edge_density:.2f}")
-                else:
-                    horizontal_lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=100, maxLineGap=50)
-                    
-                    # Check for road-like texture
-                    texture_variance = np.var(gray)
-                    
-                    # Check for road colors (asphalt grays, concrete whites)
-                    avg_brightness = np.mean(gray)
-                    
-                    # LEARNED PARAMETER VALIDATION
-                    # Calculate histogram for uniformity detection (trained feature)
-                    hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
-                    hist_norm = hist / (height * width)
-                    top_5_sum = np.sum(np.sort(hist_norm.flatten())[-5:])
-                    laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-                    
-                    # Model parameter scoring algorithm
-                    road_score = 0
-                    
-                    # PENALTY: Synthetic characteristics
-                    if top_5_sum > 0.35:
-                        road_score -= 500  # NUCLEAR PENALTY for uniform images
-                        print("🚫 Parameter Penalty: Synthetic/Uniform image detected by trained model")
-                    if laplacian_var < 50:
-                        road_score -= 500  # NUCLEAR PENALTY for flat images
-                        print("🚫 Parameter Penalty: Low texture variance (model learned threshold)")
-                    
-                    if horizontal_lines is not None and len(horizontal_lines) > 2:
-                        road_score += 30  # Linear features found
-                    if 40 < avg_brightness < 180:
-                        road_score += 25  # Road-like brightness
-                    if 500 < texture_variance < 3000:
-                        road_score += 20  # Road-like texture
-                    
-                    # Check for road surface patterns
-                    height, width = gray.shape
-                    bottom_third = gray[2*height//3:, :]
-                    bottom_variance = np.var(bottom_third)
-                    if bottom_variance > 200:  # Textured surface in bottom third
-                        road_score += 25
-                    
-                    print(f"📊 Parameter validation score: {road_score}/100")
-                    
-                    if road_score >= 50:  # Learned classification threshold (optimized on validation set)
-                        is_road_image = True
-                        relevance_reason = f"Parameter Validation: Road features confirmed by trained thresholds (score: {road_score}/100)"
-                        print(f"✅ Parameter validation: Road features confirmed")
-                    else:
-                        # SECONDARY VALIDATOR: Additional trained parameter layer for edge cases
-                        # Skip if image already penalized by learned thresholds
-                        if road_score < 0:  # Any negative score means trained parameters rejected it
-                            is_road_image = False
-                            relevance_reason = f"Synthetic/Document detected (Score: {road_score}/100) - Trained parameters rejected"
-                            print(f"🚫 Secondary validation skipped: Image rejected by primary parameters")
-                        else:
-                            print("🚨 Activating Secondary Parameter Validation Layer...")
-                            secondary_validator = SecondaryRoadClassifier()
-                            validation_result = secondary_validator.validate_road_features(img_color)
-                            
-                            if validation_result["is_road"]:
-                                is_road_image = True
-                                relevance_reason = f"Secondary Validation: {validation_result['method']} (confidence: {validation_result['confidence']:.1f}%)"
-                                print(f"✅ Secondary validation successful: {', '.join(validation_result['indicators'])}")
-                            else:
-                                is_road_image = False
-                                relevance_reason = "All Detection Layers: No road features matched trained parameters"
-                
-            # Show road detection result (regardless of human detection - that's handled in final decision)
-            print(f"🤖 Road Detection: {relevance_reason}")
-            ai_road_decision_made = True  # ML model has made a decision
-            
-        except Exception as e:
-            print(f"⚠️ Enhanced road detection error: {e}")
-            # Use secondary validation layer if primary fails
-            enhanced_road_detector = None
-    
-    # SECONDARY VALIDATION: Trained parameter thresholds ONLY if ML model unavailable OR failed to make decision
-    # AND if not already identified as a document
-    if not is_document and (enhanced_road_detector is None or not ai_road_decision_made):
-        if not ai_road_decision_made:
-            print("🔄 Applying trained parameter validation layer")
-        else:
-            print("🔄 Primary ML model unavailable, applying learned parameter thresholds")
-        # Note: avg_brightness, edges, edge_density already calculated above
-        # Note: is_document already initialized above
-        
-        # ENHANCED Document/Paper Detection - More comprehensive!
-        
-        # Multiple ways to detect documents/papers
-        
-        # Method 1: Very bright surfaces (typical paper/document lighting)
-        if avg_brightness > 140:  # Lowered threshold for better detection
-            is_document = True
-            relevance_reason = "Very bright surface - likely paper/document"
-    
-        # Method 2: SPECIFIC text detection (avoid road damage patterns)
-        if avg_brightness > 120 and edge_density > 0.003:  # Only for bright images with edges
-            # Text patterns are different from road damage - they're more regular
-            # Check for horizontal line patterns (text lines)
-            horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 1))
-            horizontal_lines = cv2.morphologyEx(edges, cv2.MORPH_OPEN, horizontal_kernel)
-            text_line_ratio = np.sum(horizontal_lines > 0) / (height * width)
-            
-            # Text has regular horizontal lines, roads have irregular damage
-            if text_line_ratio > 0.002 and avg_brightness > 130:  # Bright + horizontal lines = text
-                is_document = True
-                relevance_reason = "Text line patterns detected - document/paper image"
-    
-        # Method 3: Aspect ratio check (papers are often rectangular)
-        aspect_ratio = width / height if height > 0 else 1.0
-        if (aspect_ratio > 0.7 and aspect_ratio < 1.4) and avg_brightness > 120:
-            # Square-ish bright images are often documents
-            is_document = True
-            relevance_reason = "Rectangular bright surface - likely document"
-    
-        # Method 4: SPECIFIC paper detection (avoid bright roads)
-        if avg_brightness > 160:  # Higher threshold - only very bright surfaces
-            # Check if image is mostly grayscale AND lacks road features
-            b, g, r = cv2.split(img_color)
-            color_variance = np.var([np.mean(b), np.mean(g), np.mean(r)])
-            
-            # Look for road-specific features to EXCLUDE from document detection
-            # Check for lane markings or road patterns
-            hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
-            white_mask = cv2.inRange(hsv, np.array([0, 0, 180]), np.array([180, 30, 255]))
-            white_ratio = np.sum(white_mask > 0) / (height * width)
-            
-            # If it has white markings (lane lines), it's likely a road, not a document
-            if color_variance < 80 and white_ratio < 0.05:  # Very grayscale + no road markings
-                is_document = True
-                relevance_reason = "Pure white/gray surface - document detected"
-    
-        # Final model parameter evaluation for road classification
-        # If it's a document, immediately reject - NO EXCEPTIONS!
-        if is_document:
-            is_road_image = False
-        # Too dark to be useful road image  
-        elif avg_brightness < 40:
-            is_road_image = False
-            relevance_reason = "Too dark - road features not visible"
-        else:
-            # EXPANDED road detection - accept well-lit roads too
-            if 40 <= avg_brightness <= 160:  # WIDER brightness range (includes well-lit roads)
-                # Roads need some texture but be flexible
-                if edge_density >= 0.01:  # Lower threshold - accept cleaner roads
-                    # Check for road-specific indicators
-                    hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
-                    saturation_mean = np.mean(hsv[:,:,1])
-                    
-                    # Look for road markings (white lines) - strong road indicator
-                    white_mask = cv2.inRange(hsv, np.array([0, 0, 180]), np.array([180, 30, 255]))
-                    white_ratio = np.sum(white_mask > 0) / (height * width)
-                    
-                    # If has lane markings, definitely a road
-                    if white_ratio > 0.02:  # Has white lane markings
-                        is_road_image = True
-                        relevance_reason = "Road with lane markings detected"
-                    # Otherwise check saturation (roads are typically unsaturated)
-                    elif saturation_mean < 100:  # Unsaturated (asphalt-like or well-lit road)
-                        # Check for any road-like features
-                        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                        features = sum(1 for c in contours if cv2.contourArea(c) > 30)
-                        
-                        if features >= 2:  # Minimal features required
-                            is_road_image = True
-                            relevance_reason = "Road surface detected"
-                        else:
-                            is_road_image = False
-                            relevance_reason = "Lacks road features - too uniform"
-                    else:
-                        is_road_image = False
-                        relevance_reason = "Too colorful - not road-like"
-                else:
-                    is_road_image = False
-                    relevance_reason = "Too uniform - no road texture visible"
-            else:
-                is_road_image = False
-                relevance_reason = "Brightness outside road range (too bright for asphalt)"
-    
-    # End of parameter validation - ML model decision takes precedence
     
     # ================ PHASE 2: ML-POWERED ABUSE DETECTION (ENSEMBLE) ================
     # Using WEIGHTED ENSEMBLE of 6 YOLO MODELS for maximum accuracy!
@@ -1476,22 +1189,22 @@ def analyze_content(image_data, description):
     print("📊 FINAL DECISION PROCESSING - All Models Have Run")
     print("="*60)
     
-    # THREE SEPARATE CHECKS:
+    # FOUR SEPARATE CHECKS:
     
-    # 1. IMAGE RELEVANCE: Is it a road image? (based on your road dataset)
-    relevance_passed = is_road_image
-    
+    # 1. PRIVACY: Are there humans in the image?
     # 2. IMAGE ABUSE: Does it contain weapons/abusive content?
-    image_abuse_detected = has_image_abuse
-    
     # 3. TEXT ABUSE: Does the text contain abusive language?
+    # 4. GARBAGE: Does the image contain garbage/waste?
+    
+    image_abuse_detected = has_image_abuse
     text_abuse_detected = has_text_abuse
+    garbage_detected = (garbage_status == "garbage_detected")
     
     # DECISION PRIORITY (in order):
     # 1. Privacy (humans detected) - highest priority
     # 2. Image abuse (weapons/violence)
     # 3. Text abuse (abusive language patterns)
-    # 4. Not a road image (relevance check)
+    # 4. No garbage detected (relevance check)
     # 5. Accepted
     
     if humans_detected:
@@ -1502,27 +1215,21 @@ def analyze_content(image_data, description):
     elif image_abuse_detected:
         final_status = "REJECTED - ABUSIVE IMAGE CONTENT"
         final_reason = f"Image contains: {', '.join(image_abuse_flags)}"
-        strike_issued = True  # Strike for abusive image
+        strike_issued = True
         print(f"🚫 Decision: REJECTED_ABUSE (Image)")
     elif text_abuse_detected:
         final_status = "REJECTED - ABUSIVE TEXT CONTENT"
         final_reason = f"Text contains: {', '.join(text_abuse_flags)}"
-        strike_issued = True  # Strike for abusive text
+        strike_issued = True
         print(f"🚫 Decision: REJECTED_ABUSE (Text)")
-    elif is_document:
-        final_status = "REJECTED - NOT A ROAD IMAGE"
-        final_reason = f"Image relevance check failed: Not road-related content"
+    elif not garbage_detected:
+        final_status = "REJECTED - NO GARBAGE DETECTED"
+        final_reason = "Image does not contain visible garbage or waste"
         strike_issued = False
-        relevance_passed = False # Ensure it fails relevance check
-        print(f"📄 Decision: REJECTED_NOT_ROAD (Document)")
-    elif not relevance_passed:
-        final_status = "REJECTED - NOT A ROAD IMAGE"
-        final_reason = f"Image relevance check failed: {relevance_reason}"
-        strike_issued = False
-        print(f"🚫 Decision: REJECTED_NOT_ROAD")
+        print(f"❌ Decision: REJECTED (No garbage found)")
     else:
         final_status = "ACCEPTED"
-        final_reason = "Road image + Clean content"
+        final_reason = "All checks passed - garbage detected, no violations"
         strike_issued = False
         print(f"✅ Decision: ACCEPTED")
     
@@ -1532,20 +1239,6 @@ def analyze_content(image_data, description):
     # Model output: All confidence scores computed and displayed
     
     result = {
-        'image_relevance_check': {
-            'is_road_image': relevance_passed,  # Always show actual result
-            'reason': relevance_reason,  # Always show actual reason
-            'ai_powered': enhanced_road_detector is not None,
-            'ai_confidence': round(ml_confidence, 3) if ml_confidence > 0 else 0.0,  # Always show actual confidence
-            'note': 'Primary ML model' if enhanced_road_detector else 'Parameter validation layer',
-            'image_metrics': {
-                'dimensions': f"{width}x{height}",
-                'brightness': round(avg_brightness, 1),
-                'edge_density': round(edge_density, 4)
-            },
-            'models_ran': True,  # Confirm models actually ran
-            'confidence_source': 'actual_model_output'  # Confirm this is real data
-        },
         'image_abuse_check': {
             'detected': image_abuse_detected,
             'flags': image_abuse_flags,
@@ -1634,7 +1327,7 @@ def home():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Road Issue Reporting - AI Demo</title>
+    <title>Garbage Reporting - AI System</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
         .container { background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -1659,18 +1352,18 @@ def home():
 </head>
 <body>
     <div class="container">
-        <h1>🛣️ Road Issue Reporting AI</h1>
+        <h1>🗑️ Garbage Reporting System</h1>
         
         <div class="upload-section">
             <input type="file" id="imageInput" accept="image/*" style="display: none;">
-            <button onclick="document.getElementById('imageInput').click()" style="background-color: #3498db; width: auto; margin-bottom: 10px;">📸 Select Road Image</button>
+            <button onclick="document.getElementById('imageInput').click()" style="background-color: #3498db; width: auto; margin-bottom: 10px;">📸 Select Garbage Image</button>
             <p id="fileName">No file selected</p>
             <img id="imagePreview" class="preview-image">
         </div>
 
         <div class="form-group">
             <label for="description">Issue Description:</label>
-            <textarea id="description" placeholder="Describe the road issue (e.g., 'Large pothole causing traffic jam')..."></textarea>
+            <textarea id="description" placeholder="Describe the garbage issue (e.g., 'Illegal dumping site with plastic waste')..."></textarea>
         </div>
 
         <button onclick="analyzeContent()">🔍 Analyze Content</button>
@@ -1759,41 +1452,13 @@ def home():
                     <p style="font-size: 0.8em; color: #666; margin-top: 10px;">System: ${decision.system_type}</p>
                 </div>
 
+                ${data.garbage_classification && data.garbage_classification.status !== 'unknown' ? `
                 <div class="result-card">
-                    <h3>🛣️ Road Relevancy Check</h3>
-                    <div class="metric">
-                        <span>Is Road Image?</span>
-                        <span>${data.image_relevance_check.is_road_image === null ? '⏭️ N/A' : (data.image_relevance_check.is_road_image ? '✅ Yes' : '❌ No')}</span>
-                    </div>
-                    <div class="metric">
-                        <span>Confidence</span>
-                        <span>${data.image_relevance_check.ai_confidence ? (data.image_relevance_check.ai_confidence * 100).toFixed(1) + '%' : 'N/A'}</span>
-                    </div>
-                    <div class="metric">
-                        <span>Method</span>
-                        <span>${data.image_relevance_check.note}</span>
-                    </div>
-                    
-                    <h4 style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">📊 Image Metrics</h4>
-                    <div class="metric">
-                        <span>Dimensions</span>
-                        <span>${data.image_relevance_check.image_metrics ? data.image_relevance_check.image_metrics.dimensions : 'N/A'}</span>
-                    </div>
-                    <div class="metric">
-                        <span>Brightness</span>
-                        <span>${data.image_relevance_check.image_metrics ? data.image_relevance_check.image_metrics.brightness : 'N/A'}</span>
-                    </div>
-                    <div class="metric">
-                        <span>Edge Density</span>
-                        <span>${data.image_relevance_check.image_metrics ? data.image_relevance_check.image_metrics.edge_density : 'N/A'}</span>
-                    </div>
-                    
-                    ${data.garbage_classification && data.garbage_classification.status !== 'unknown' ? `
-                    <h4 style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">🗑️ Road Cleanliness</h4>
+                    <h3>🗑️ Garbage Detection</h3>
                     <div class="metric">
                         <span>Status</span>
                         <span style="font-weight: bold; color: ${data.garbage_classification.status === 'clean' ? '#27ae60' : '#e74c3c'};">
-                            ${data.garbage_classification.status === 'clean' ? '✅ CLEAN' : '🗑️ GARBAGE DETECTED'}
+                            ${data.garbage_classification.status === 'clean' ? '❌ NO GARBAGE' : '✅ GARBAGE DETECTED'}
                         </span>
                     </div>
                     <div class="metric">
@@ -1803,8 +1468,8 @@ def home():
                     <p style="font-size: 0.85em; color: #666; margin-top: 8px; font-style: italic;">
                         ${data.garbage_classification.message}
                     </p>
-                    ` : ''}
                 </div>
+                ` : ''}
 
                 <div class="result-card">
                     <h3>🛡️ Abuse & Safety Check</h3>
@@ -1893,6 +1558,6 @@ def check_image_api():
 
 
 if __name__ == '__main__':
-    print("🚀 Starting Working Demo Web App...")
-    print("🌍 Open your browser at: http://localhost:5001")
-    app.run(debug=True, port=5001, host='0.0.0.0')
+    print("🚀 Starting Garbage Reporting System...")
+    print("🌍 Open your browser at: http://localhost:5002")
+    app.run(debug=True, port=5002, host='0.0.0.0')
