@@ -1297,10 +1297,69 @@ def analyze_content(image_data, description):
     
     print("="*60 + "\n")
     
-    # ================ STEP 3: RETURN RESULTS WITH ACTUAL CONFIDENCE VALUES ================
+    # ================ STEP 3: PREPARE USER-FRIENDLY MESSAGES FOR FLUTTER APP ================
+    # Create clear, detailed, polite messages that anyone can understand (including rural users)
+    user_friendly_message = ""
+    user_friendly_title = ""
+    user_detailed_explanation = ""
+    what_to_do_next = ""
+    can_proceed_to_next = False
+    
+    if final_status == "ACCEPTED":
+        can_proceed_to_next = True
+        user_friendly_title = "✅ Your Report Has Been Approved"
+        user_friendly_message = "Great news! Your garbage report has successfully passed all our safety and quality checks."
+        user_detailed_explanation = "We have carefully reviewed your image and description. Everything looks good! Your report shows a real garbage or waste problem, contains no inappropriate content, and protects everyone's privacy. Your submission is now being forwarded to the next stage for further processing."
+        what_to_do_next = "Your report will be reviewed by our team soon. You will receive updates on the progress. Thank you for helping keep your area clean and reporting waste issues!"
+        
+    elif final_status == "PRIVACY_PROTECTED":
+        user_friendly_title = "🛡️ Privacy Protection Alert"
+        user_friendly_message = "We found a person visible in your photo. We need to protect everyone's privacy and identity."
+        user_detailed_explanation = "Our system detected that someone appears in your image (it could be their face, body, hands, or any visible part). To keep everyone safe and protect their privacy, we cannot accept photos with people in them. This is important for protecting the identity and personal information of individuals who may appear in public photos."
+        what_to_do_next = "Please take a new photo of the garbage problem WITHOUT any people visible in the image. Make sure no one is standing nearby, and wait for people to move away before taking the picture. Then submit your report again with the new photo."
+        
+    elif "ABUSIVE IMAGE CONTENT" in final_status:
+        user_friendly_title = "⚠️ Image Contains Inappropriate Content"
+        user_friendly_message = "Your photo contains items or content that violate our community safety guidelines."
+        user_detailed_explanation = "Our safety system detected potentially harmful or dangerous items in your image (such as weapons, violent content, or other inappropriate materials). Our platform is designed to help report garbage and waste problems safely. We cannot accept images that contain threatening, violent, or inappropriate content as this violates our community standards and safety rules."
+        what_to_do_next = "Please take a new, clear photo that shows ONLY the garbage or waste problem you want to report. Make sure there are no weapons, violent content, or any inappropriate items visible in the picture. Focus the camera on the garbage, trash, or waste issue itself."
+        
+    elif "ABUSIVE TEXT CONTENT" in final_status:
+        user_friendly_title = "⚠️ Description Contains Inappropriate Language"
+        user_friendly_message = "The words you used in your description are not appropriate and violate our community guidelines."
+        user_detailed_explanation = "Our language detection system found offensive, abusive, or inappropriate words in your text description. We want to keep our platform respectful and safe for everyone. Using bad language, threats, hate speech, or disrespectful words is not allowed and makes others feel uncomfortable or unsafe."
+        what_to_do_next = "Please rewrite your description using polite and respectful language. Simply describe the garbage problem clearly (example: 'There is a pile of plastic waste dumped near the bus stop'). Avoid using offensive words, threats, or disrespectful language. Keep your description professional and factual."
+        
+    elif "NO GARBAGE DETECTED" in final_status:
+        user_friendly_title = "📸 No Garbage or Waste Found in Photo"
+        user_friendly_message = "We couldn't find any visible garbage, trash, or waste in the image you submitted."
+        user_detailed_explanation = "Our garbage detection system analyzed your photo carefully but could not identify any garbage, trash, waste, litter, or dumped materials in it. This platform is specifically designed for reporting problems with garbage and waste (like illegal dumping, overflowing bins, plastic waste, scattered trash, etc.). Your image might show a clean area, be too far away, or not clearly show the garbage problem you want to report."
+        what_to_do_next = "Please take a new, clear photo that shows the actual garbage or waste problem. Go to the location where the garbage is located. Point your camera directly at the trash, waste pile, dumped items, or garbage issue. Get close enough so the garbage is clearly visible in the photo. Make sure the lighting is good so we can see the waste clearly. Then submit again with this new photo."
+        
+    else:
+        user_friendly_title = "❌ Submission Could Not Be Processed"
+        user_friendly_message = "We encountered a problem while reviewing your submission and cannot accept it at this time."
+        user_detailed_explanation = "Your submission did not meet one or more of our requirements for garbage reporting. This could be because the image quality is too poor, the content is unclear, or there are other issues preventing us from processing your report properly. We want to make sure all reports are clear, safe, and helpful."
+        what_to_do_next = "Please try again with a new submission. Make sure to: 1) Take a clear, well-lit photo of the actual garbage or waste problem, 2) Ensure no people are visible in the photo, 3) Write a clear description without offensive language, 4) Make sure the photo clearly shows trash, garbage, or waste. If problems continue, please contact support for help."
+    
+    # ================ STEP 4: RETURN RESULTS WITH ACTUAL CONFIDENCE VALUES ================
     # Model output: All confidence scores computed and displayed
     
     result = {
+        # Flutter-specific response (detailed structure for mobile app - easy to understand for all users)
+        'flutter_response': {
+            'success': can_proceed_to_next,
+            'can_proceed': can_proceed_to_next,
+            'title': user_friendly_title,
+            'message': user_friendly_message,
+            'detailed_explanation': user_detailed_explanation,
+            'what_to_do_next': what_to_do_next,
+            'status_code': 'APPROVED' if can_proceed_to_next else 'REJECTED',
+            'component_name': 'Content Moderation & Safety Check',
+            'component_number': 1,
+            'total_components': 4,
+            'timestamp': 'processed'
+        },
         'image_abuse_check': {
             'detected': image_abuse_detected,
             'flags': image_abuse_flags,
