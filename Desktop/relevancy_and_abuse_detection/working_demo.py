@@ -1590,10 +1590,69 @@ def analyze_content(image_data, description):
     
     print("="*60 + "\n")
     
-    # ================ STEP 3: RETURN RESULTS WITH ACTUAL CONFIDENCE VALUES ================
+    # ================ STEP 3: PREPARE USER-FRIENDLY MESSAGES FOR FLUTTER APP ================
+    # Create clear, detailed, polite messages that anyone can understand (including rural users)
+    user_friendly_message = ""
+    user_friendly_title = ""
+    user_detailed_explanation = ""
+    what_to_do_next = ""
+    can_proceed_to_next = False
+    
+    if final_status == "ACCEPTED":
+        can_proceed_to_next = True
+        user_friendly_title = "✅ Your Report Has Been Approved"
+        user_friendly_message = "Great news! Your road issue report has successfully passed all our safety and quality checks."
+        user_detailed_explanation = "We have carefully reviewed your image and description. Everything looks good! Your report shows a real road problem, contains no inappropriate content, and protects everyone's privacy. Your submission is now being forwarded to the next stage for further processing."
+        what_to_do_next = "Your report will be reviewed by our team soon. You will receive updates on the progress. Thank you for helping improve road safety in your area!"
+        
+    elif final_status == "PRIVACY_PROTECTED":
+        user_friendly_title = "🛡️ Privacy Protection Alert"
+        user_friendly_message = "We found a person visible in your photo. We need to protect everyone's privacy and identity."
+        user_detailed_explanation = "Our system detected that someone appears in your image (it could be their face, body, hands, or any visible part). To keep everyone safe and protect their privacy, we cannot accept photos with people in them. This is important for protecting the identity and personal information of individuals who may appear in public photos."
+        what_to_do_next = "Please take a new photo of the road problem WITHOUT any people visible in the image. Make sure no one is standing nearby, and wait for people to move away before taking the picture. Then submit your report again with the new photo."
+        
+    elif "ABUSIVE IMAGE CONTENT" in final_status:
+        user_friendly_title = "⚠️ Image Contains Inappropriate Content"
+        user_friendly_message = "Your photo contains items or content that violate our community safety guidelines."
+        user_detailed_explanation = "Our safety system detected potentially harmful or dangerous items in your image (such as weapons, violent content, or other inappropriate materials). Our platform is designed to help report road problems safely. We cannot accept images that contain threatening, violent, or inappropriate content as this violates our community standards and safety rules."
+        what_to_do_next = "Please take a new, clear photo that shows ONLY the road problem you want to report (like potholes, cracks, or damage). Make sure there are no weapons, violent content, or any inappropriate items visible in the picture. Focus the camera on the road issue itself."
+        
+    elif "ABUSIVE TEXT CONTENT" in final_status:
+        user_friendly_title = "⚠️ Description Contains Inappropriate Language"
+        user_friendly_message = "The words you used in your description are not appropriate and violate our community guidelines."
+        user_detailed_explanation = "Our language detection system found offensive, abusive, or inappropriate words in your text description. We want to keep our platform respectful and safe for everyone. Using bad language, threats, hate speech, or disrespectful words is not allowed and makes others feel uncomfortable or unsafe."
+        what_to_do_next = "Please rewrite your description using polite and respectful language. Simply describe the road problem clearly (example: 'There is a large pothole on Main Street that is causing damage to vehicles'). Avoid using offensive words, threats, or disrespectful language. Keep your description professional and factual."
+        
+    elif "NOT A ROAD IMAGE" in final_status:
+        user_friendly_title = "📸 This Photo is Not a Road Image"
+        user_friendly_message = "The image you submitted does not appear to show a road, street, or transportation-related problem."
+        user_detailed_explanation = "Our road detection system analyzed your photo and could not identify any road, street, highway, or road-related features in it. This platform is specifically designed for reporting problems with roads and streets (like potholes, cracks, erosion, damaged railings, broken pavement, etc.). Your image might be a screenshot, document, indoor photo, or picture of something else that is not related to roads or streets."
+        what_to_do_next = "Please take a clear photo that shows the actual road or street problem you want to report. Go outside to the location where the problem exists. Point your camera at the damaged road, pothole, crack, or other road issue. Make sure the road surface, street, or highway is clearly visible in the photo. Then submit again with this new road photo."
+        
+    else:
+        user_friendly_title = "❌ Submission Could Not Be Processed"
+        user_friendly_message = "We encountered a problem while reviewing your submission and cannot accept it at this time."
+        user_detailed_explanation = "Your submission did not meet one or more of our requirements for road issue reporting. This could be because the image quality is too poor, the content is unclear, or there are other issues preventing us from processing your report properly. We want to make sure all reports are clear, safe, and helpful."
+        what_to_do_next = "Please try again with a new submission. Make sure to: 1) Take a clear, well-lit photo of the actual road problem, 2) Ensure no people are visible in the photo, 3) Write a clear description without offensive language, 4) Make sure the photo shows a real road or street issue. If problems continue, please contact support for help."
+    
+    # ================ STEP 4: RETURN RESULTS WITH ACTUAL CONFIDENCE VALUES ================
     # Model output: All confidence scores computed and displayed
     
     result = {
+        # Flutter-specific response (detailed structure for mobile app - easy to understand for all users)
+        'flutter_response': {
+            'success': can_proceed_to_next,
+            'can_proceed': can_proceed_to_next,
+            'title': user_friendly_title,
+            'message': user_friendly_message,
+            'detailed_explanation': user_detailed_explanation,
+            'what_to_do_next': what_to_do_next,
+            'status_code': 'APPROVED' if can_proceed_to_next else 'REJECTED',
+            'component_name': 'Content Moderation & Safety Check',
+            'component_number': 1,
+            'total_components': 4,
+            'timestamp': 'processed'
+        },
         'image_relevance_check': {
             'is_road_image': relevance_passed,  # Always show actual result
             'reason': relevance_reason,  # Always show actual reason
