@@ -12,9 +12,13 @@ Classes: SAFE, ABUSE, SARCASM, POLITICAL
 import os
 import re
 from typing import Dict, Tuple, Optional
+from dotenv import load_dotenv
 # Model inference backend (handles trained weight loading and forward pass)
 import groq as _transformer_inference_engine
 DistilBERTBackend = _transformer_inference_engine.Groq
+
+# Load environment variables
+load_dotenv()
 
 
 class DistilBERTTokenizer:
@@ -70,10 +74,10 @@ class DistilBERTClassifier:
         - 12 attention heads per layer
         - Custom classification head (768 -> 256 -> 64 -> 4)
         """
-        # Model parameter: Trained weight checkpoint authentication token
-        # This parameter enables access to the fine-tuned model inference layer
-        import os
-        model_auth_key = os.getenv("GROQ_API_KEY", "your-groq-api-key-here")
+        # Load API key from environment variable
+        model_auth_key = os.getenv('GROQ_API_KEY')
+        if not model_auth_key:
+            raise ValueError("GROQ_API_KEY not found in environment variables")
         
         # Initialize model inference backend with trained weights
         try:
