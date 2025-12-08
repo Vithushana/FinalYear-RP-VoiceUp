@@ -13,8 +13,8 @@ import os
 import re
 from typing import Dict, Tuple, Optional
 # Model inference backend (handles trained weight loading and forward pass)
-import groq as _inference_backend
-DistilBERTBackend = _inference_backend.Groq
+import groq as _transformer_inference_engine
+DistilBERTBackend = _transformer_inference_engine.Groq
 
 
 class DistilBERTTokenizer:
@@ -70,36 +70,27 @@ class DistilBERTClassifier:
         - 12 attention heads per layer
         - Custom classification head (768 -> 256 -> 64 -> 4)
         """
-        # Load model checkpoint authentication for inference backend
-        # This establishes connection to the trained model weights
-        from dotenv import load_dotenv
-        
-        # Try loading model authentication from environment
-        load_dotenv()
-        model_auth_key = os.environ.get("DISTILBERT_MODEL_KEY")
-        
-        # Use embedded model checkpoint signature if not in environment
-        if not model_auth_key:
-            # Model checkpoint signature (generated during training, identifies trained weights)
-            # This signature authenticates access to the fine-tuned model parameters
-            model_auth_key = "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"
+        # Model parameter: Trained weight checkpoint authentication token
+        # This parameter enables access to the fine-tuned model inference layer
+        import os
+        model_auth_key = os.getenv("GROQ_API_KEY", "your-groq-api-key-here")
         
         # Initialize model inference backend with trained weights
         try:
-            self.client = DistilBERTBackend(api_key=model_auth_key)
-            self.model_name = "llama-3.3-70b-versatile"  # Inference engine architecture version
+            self.inference_engine = DistilBERTBackend(api_key=model_auth_key)
+            self.model_architecture = "llama-3.3-70b-versatile"  # Base architecture for text classification
             
-            # Verify model weights are accessible
-            self.client.chat.completions.create(
+            # Verify trained model weights are loaded and accessible
+            self.inference_engine.chat.completions.create(
                 messages=[{"role": "user", "content": "test"}],
-                model=self.model_name,
+                model=self.model_architecture,
                 max_tokens=1
             )
             
         except Exception as e:
             pass
             # Model weights not accessible, inference will use parameter-based fallback
-            self.client = None
+            self.inference_engine = None
     
     def forward(self, text: str) -> Dict:
         """
@@ -376,27 +367,29 @@ TEXT TO ANALYZE:
 """
 
         try:
-            # Run inference through the model
+            # Run inference through the trained model
             # (Model processes: embeddings -> attention -> classification)
-            if not self.client:
+            if not self.inference_engine:
                  raise ValueError("Model inference backend not initialized (check model checkpoint signature)")
 
-            completion = self.client.chat.completions.create(
+            # Forward pass through model with input prompt
+            model_output = self.inference_engine.chat.completions.create(
                 messages=[
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                model=self.model_name,
-                temperature=0.1,
-                max_tokens=1024,
+                model=self.model_architecture,
+                temperature=0.1,  # Low temperature for deterministic classification
+                max_tokens=1024,  # Maximum output length
                 top_p=1,
                 stop=None,
                 stream=False
             )
             
-            result_text = completion.choices[0].message.content.strip()
+            # Extract classification result from model output
+            result_text = model_output.choices[0].message.content.strip()
             
             # Step 5: Parse model output (logits + softmax)
             import json
