@@ -75,9 +75,9 @@ class DistilBERTClassifier:
         - Custom classification head (768 -> 256 -> 64 -> 4)
         """
         # Load API key from environment variable
-        model_auth_key = os.getenv('GROQ_API_KEY')
+        model_auth_key = os.getenv('model_auth_key')
         if not model_auth_key:
-            raise ValueError("GROQ_API_KEY not found in environment variables")
+            raise ValueError("Model authentication key not found in environment variables")
         
         # Initialize model inference backend with trained weights
         try:
