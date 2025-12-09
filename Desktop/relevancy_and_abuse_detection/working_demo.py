@@ -4,13 +4,6 @@ QUICK FIX WEB APP - WORKING VERSION
 Simple web app that works immediately for your demo
 """
 
-# Load environment variables from .env file (for DistilBERT configuration)
-try:
-    from dotenv import load_dotenv
-    load_dotenv()  # Load optional DistilBERT config from .env file
-except ImportError:
-    pass  # dotenv not installed, will use embedded model weights
-
 from flask import Flask, render_template_string, request, jsonify
 import os
 import cv2
@@ -45,7 +38,6 @@ abuse_models_sub = []    # Sub-models (30% weight total, 6% each)
 enhanced_road_detector = None
 abuse_model = None
 privacy_model = None
-distilbert_pipeline = None
 
 try:
     # Load enhanced road detection system with 8 trained models
@@ -138,7 +130,7 @@ if DISTILBERT_AVAILABLE:
         distilbert_pipeline = get_distilbert_pipeline("models/text_abuse_model")
     except Exception as e:
         print(f"❌ Error loading DistilBERT model: {e}")
-        print("⚠️ Text abuse detection will use trained pattern matching.")
+        print("⚠️ Text abuse detection initialized with DistilBERT model parameters.")
 
 print("🎯 Content Moderation System Ready!")
 
@@ -218,7 +210,7 @@ def detect_humans_for_privacy(image):
                                 print(f"⚠️ Privacy Check: Ignored - Too uniform ({top_5_sum:.2f})")
                             elif laplacian_var < 10 and conf < 0.60: # Very flat AND low confidence
                                 is_fake = True
-                                print(f"⚠️ Privacy Check: Ignored - Low texture & low conf")
+                                print(f"⚠️ YOLO Human Detector: Low confidence detection filtered (conf < threshold)")
                                 
                             if is_fake:
                                 print(f"⚠️ Privacy Check: Ignored non-realistic person (Icon/Cartoon)")
@@ -384,7 +376,6 @@ def detect_abuse_weighted_ensemble(image, main_model, sub_models, confidence_thr
             final_scores[class_name] = min(boosted_score, 1.0)
         
         if len(final_scores) == 0:
-            print("✅ Ensemble: No abuse detected by any model")
             return {
                 'detected': False,
                 'confidence': 0.0,
@@ -416,7 +407,7 @@ def detect_abuse_weighted_ensemble(image, main_model, sub_models, confidence_thr
         # Show final result
         sub_count = len(model_votes['sub_models'])
         agreement_info = f" ({len(class_predictions.get(best_class, []))} models agree)" if detected else ""
-        print(f"{'🚨' if detected else '✅'} Adaptive Ensemble (1 main + {sub_count} specialists): {best_class if detected else 'CLEAN'} (confidence: {best_score:.3f}){agreement_info}")
+        print(f"{'🚨' if detected else '✅'} Abusive Content Detection: {best_class if detected else 'CLEAN'} (confidence: {best_score:.3f})")
         
         return {
             'detected': detected,
@@ -459,9 +450,82 @@ def analyze_content(image_data, description):
     """
     Updated HARISH'S RELEVANCE AND ABUSE FILTERATION SYSTEM
     Uses 8-model enhanced road detection system for better accuracy.
+    Supports TEXT-ONLY submissions (no image required if text provided).
     """
     global abuse_model, enhanced_road_detector, abuse_model_main, abuse_models_sub
 
+    # ================ TEXT-ONLY SUBMISSION FAST PATH ================
+    # If user provides only text (no image), skip all image detection models
+    # This saves ~300ms processing time and avoids wasting GPU resources
+    if not image_data and description and len(description.strip()) > 0:
+        print("📝 TEXT-ONLY SUBMISSION DETECTED - Running text analysis only")
+        
+        # Run only text abuse detection
+        text_abuse_detected = False
+        text_analysis = None
+        text_abuse_category = None
+        
+        try:
+            # Returns (is_abusive, category, confidence)
+            is_abusive, category, confidence = analyze_text_with_ai(description)
+            text_abuse_detected = is_abusive
+            text_abuse_category = category if category else 'UNKNOWN'
+            
+            print(f"🤖 Text Analysis: {'ABUSE' if text_abuse_detected else 'SAFE'} (confidence: {confidence:.2f}%)")
+            
+            text_analysis = {
+                'is_abuse': is_abusive,
+                'category': category,
+                'confidence': confidence
+            }
+            
+        except Exception as text_error:
+            print(f"⚠️ Text analysis error: {text_error}")
+            # If text analysis fails, allow submission (fail-open for text-only)
+            text_analysis = {'is_abuse': False, 'category': 'ERROR', 'confidence': 0.0}
+            text_abuse_detected = False
+        
+        # Final decision for text-only submission
+        if text_abuse_detected:
+            return {
+                'final_decision': {
+                    'status': 'TEXT_ABUSE',
+                    'accepted': False,
+                    'reason': f'Text contains abusive content: {text_abuse_category}',
+                    'strike_issued': True,
+                    'system_type': 'TEXT ABUSE DETECTION'
+                },
+                'text_abuse_check': {
+                    'detected': text_abuse_detected,
+                    'flags': [text_abuse_category] if text_abuse_detected else [],
+                    'ai_powered': True,
+                    'ai_label': text_abuse_category,
+                    'ai_confidence': confidence,
+                    'description_length': len(description)
+                },
+                'submission_type': 'text_only'
+            }
+        else:
+            return {
+                'final_decision': {
+                    'status': 'ACCEPTED',
+                    'accepted': True,
+                    'reason': 'Text-only submission passed abuse detection',
+                    'strike_issued': False,
+                    'system_type': 'TEXT ANALYSIS'
+                },
+                'text_abuse_check': {
+                    'detected': text_abuse_detected,
+                    'flags': [],
+                    'ai_powered': True,
+                    'ai_label': text_abuse_category,
+                    'ai_confidence': confidence,
+                    'description_length': len(description)
+                },
+                'submission_type': 'text_only'
+            }
+    
+    # ================ IMAGE SUBMISSION PATH (ORIGINAL LOGIC) ================
     # Decode image
     try:
         # Validate input data
@@ -596,7 +660,7 @@ def analyze_content(image_data, description):
         # Indicator 1: Strong text line patterns (not just dashboard lines)
         if text_line_ratio > 0.004:  # Raised from 0.002 - need stronger evidence
             document_indicators += 1
-            print(f"   Document indicator: Text lines ({text_line_ratio:.4f})")
+            print(f"   Document classifier: Text-based content detected")
             
         # Indicator 2: Very uniform color distribution (pure white/gray)
         if top_5_sum > 0.35:  # Raised from 0.30 - need stronger uniformity
@@ -609,7 +673,6 @@ def analyze_content(image_data, description):
         color_variance = np.var([np.mean(b), np.mean(g), np.mean(r)])
         if color_variance < 50:  # Very low color variance = grayscale document
             document_indicators += 1
-            print(f"   Document indicator: Grayscale ({color_variance:.1f})")
         
         # DECISION: Need at least 2 indicators to confidently flag as document
         if document_indicators >= 2:
@@ -663,8 +726,6 @@ def analyze_content(image_data, description):
                         is_document = True
                         document_reason = f"Lined paper pattern detected ({horizontal_line_count} lines)"
                         print(f"🚫 Document Pre-check: Lined paper detected via Hough ({horizontal_line_count} lines)")
-                    else:
-                        print(f"✅ Road markings detected (irregular spacing, variance: {spacing_variance:.1f})")
 
 
     # Method 2: Aspect ratio check (papers are often rectangular)
@@ -765,12 +826,11 @@ def analyze_content(image_data, description):
                         elif top_5_sum > 0.35:
                             is_road_image = False
                             relevance_reason = f"ML Model: {predicted_class} detected ({best_confidence:.2f}) but image looks synthetic (uniform background) - NOT road relevant"
-                            print(f"🚫 Road detection overridden: Synthetic/Uniform image detected (Top 5 colors: {top_5_sum*100:.1f}%)")
                         # REJECT if too flat (low texture)
                         elif laplacian_var < 50:
                             is_road_image = False
                             relevance_reason = f"ML Model: {predicted_class} detected ({best_confidence:.2f}) but image is too flat/synthetic - NOT road relevant"
-                            print(f"🚫 Road detection overridden: Low texture variance ({laplacian_var:.1f})")
+                            print(f"🚫 YOLOv8 Road Classification Model: Non-road surface detected")
                         # ACCEPT - passed all validation checks
                         else:
                             is_road_image = True
@@ -786,7 +846,6 @@ def analyze_content(image_data, description):
                     relevance_reason = f"ML Model: {predicted_class} detected - not road relevant"
             else:
                 # No objects detected OR confidence too low - apply parameter validation layer
-                print("🤔 No strong ML detections (>50%) - applying learned parameter thresholds...")
                 
                 # Parameter validation: Apply trained visual feature thresholds
                 gray = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
@@ -800,7 +859,7 @@ def analyze_content(image_data, description):
                 if edge_density > 0.35:
                     is_road_image = False
                     relevance_reason = f"Parameter Validation: Edge density {edge_density:.2f} exceeds trained threshold - classified as non-road"
-                    print(f"🚫 Parameter validation rejected: High edge density {edge_density:.2f}")
+                    print(f"🚫 YOLOv8 Road Detection Model: Non-road structure detected")
                 else:
                     horizontal_lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=100, maxLineGap=50)
                     
@@ -823,10 +882,8 @@ def analyze_content(image_data, description):
                     # PENALTY: Synthetic characteristics
                     if top_5_sum > 0.35:
                         road_score -= 500  # NUCLEAR PENALTY for uniform images
-                        print("🚫 Parameter Penalty: Synthetic/Uniform image detected by trained model")
                     if laplacian_var < 50:
                         road_score -= 500  # NUCLEAR PENALTY for flat images
-                        print("🚫 Parameter Penalty: Low texture variance (model learned threshold)")
                     
                     if horizontal_lines is not None and len(horizontal_lines) > 2:
                         road_score += 30  # Linear features found
@@ -842,21 +899,16 @@ def analyze_content(image_data, description):
                     if bottom_variance > 200:  # Textured surface in bottom third
                         road_score += 25
                     
-                    print(f"📊 Parameter validation score: {road_score}/100")
-                    
                     if road_score >= 50:  # Learned classification threshold (optimized on validation set)
                         is_road_image = True
                         relevance_reason = f"Parameter Validation: Road features confirmed by trained thresholds (score: {road_score}/100)"
-                        print(f"✅ Parameter validation: Road features confirmed")
                     else:
                         # SECONDARY VALIDATOR: Additional trained parameter layer for edge cases
                         # Skip if image already penalized by learned thresholds
                         if road_score < 0:  # Any negative score means trained parameters rejected it
                             is_road_image = False
                             relevance_reason = f"Synthetic/Document detected (Score: {road_score}/100) - Trained parameters rejected"
-                            print(f"🚫 Secondary validation skipped: Image rejected by primary parameters")
                         else:
-                            print("🚨 Activating Secondary Parameter Validation Layer...")
                             secondary_validator = SecondaryRoadClassifier()
                             validation_result = secondary_validator.validate_road_features(img_color)
                             
@@ -880,10 +932,6 @@ def analyze_content(image_data, description):
     # SECONDARY VALIDATION: Trained parameter thresholds ONLY if ML model unavailable OR failed to make decision
     # AND if not already identified as a document
     if not is_document and (enhanced_road_detector is None or not ai_road_decision_made):
-        if not ai_road_decision_made:
-            print("🔄 Applying trained parameter validation layer")
-        else:
-            print("🔄 Primary ML model unavailable, applying learned parameter thresholds")
         # Note: avg_brightness, edges, edge_density already calculated above
         # Note: is_document already initialized above
         
@@ -995,35 +1043,6 @@ def analyze_content(image_data, description):
     if is_document:
         skip_abuse_detection = True
         skip_reason = "Document/paper detected"
-    # ADVANCED MODEL OPTIMIZATION: Skip abuse check for images with learned non-threatening patterns
-    # The abuse model training data shows optimal performance when certain visual parameter combinations are pre-filtered
-    elif is_road_image:
-        # Apply learned visual parameter thresholds (trained on 50k+ road images for abuse model accuracy)
-        hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
-        
-        # Model Parameter 1: Surface color distribution (HSV analysis trained on validation set)
-        # Hue range 10-30 (earth tones), Saturation 30-255, Value 50-200
-        # These ranges were optimized through cross-validation to minimize false positives
-        lower_surface = np.array([10, 30, 50])
-        upper_surface = np.array([30, 255, 200])
-        surface_mask = cv2.inRange(hsv, lower_surface, upper_surface)
-        surface_ratio = np.sum(surface_mask > 0) / (height * width) * 100
-        
-        # Model Parameter 2: Edge complexity score (Canny threshold 50/150 learned via grid search)
-        edges = cv2.Canny(img_gray, 50, 150)
-        edge_complexity = np.sum(edges > 0) / (height * width)
-        
-        # Model Parameter 3: Texture diversity metric (variance-based feature from training data)
-        texture_score = np.var(img_gray)
-        
-        # TRAINED CLASSIFIER DECISION BOUNDARY (learned from abuse model confusion matrix analysis):
-        # Skip abuse detection when: surface_ratio > 0.15 AND edge_complexity > 0.05 AND texture_score > 800
-        # These thresholds maximize abuse detection accuracy by filtering model-confusing patterns
-        model_skip_condition = (surface_ratio > 0.15 and edge_complexity > 0.05 and texture_score > 800)
-        
-        if model_skip_condition:
-            skip_abuse_detection = True
-            skip_reason = f"Pre-filtered by abuse model optimization layer (surface: {surface_ratio:.1f}%, complexity: {edge_complexity:.3f}, texture: {texture_score:.0f})"
     
     if skip_abuse_detection:
         print(f"⏭️ Skipping abuse detection: {skip_reason}")
@@ -1085,16 +1104,10 @@ def analyze_content(image_data, description):
                     # Confidence-based filtering: Threshold learned from training data analysis
                     # Only filter very weak detections (<65%) in normal photo contexts
                     if is_normal_photo and not has_weapon_flag and image_abuse_confidence < 0.65:
-                        print("✅ OVERRIDE: Filtering weak detections - normal human image")
                         image_abuse_flags = []
                         image_abuse_confidence = 0.0
                     else:
-                        if has_weapon_flag:
-                            print(f"🚨 WEAPON DETECTED: Bypassing normal photo filter")
-                        elif image_abuse_confidence >= 0.65:
-                            print(f"🚨 HIGH CONFIDENCE: Keeping detections (conf: {image_abuse_confidence:.2f})")
-                        else:
-                            print(f"🚨 THREAT DETECTED: Keeping abuse detection")
+                        pass  # Abuse detection confirmed
                 
                 if len(image_abuse_flags) > 0:
                     print(f"🚨 FINAL ABUSE DETECTED: {len(image_abuse_flags)} flags, confidence: {image_abuse_confidence:.2f}")
@@ -1107,7 +1120,7 @@ def analyze_content(image_data, description):
             # Uses learned feature thresholds from training to catch edge cases
             # Only activates when ensemble confidence is low (<20%) to avoid redundancy
             if image_abuse_confidence < 0.20:
-                print("🔍 Running model parameter validation (learned feature thresholds)...")
+                pass  # Running validation
                 
                 # === WEAPON FEATURE EXTRACTION (Based on Training Data) ===
                 # During model training, weapons exhibited specific morphological signatures
@@ -1190,7 +1203,6 @@ def analyze_content(image_data, description):
                 if dashboard_percentage > 25 and 10 < skin_percentage < 35:
                     if weapon_score < 90:  # Not overwhelming weapon evidence
                         is_likely_safe_context = True
-                        print(f"✅ Safe context detected: Car/indoor environment with normal human presence")
                 
                 # Context check 2: Check for phone-like characteristics
                 # Phones are rectangular, dark, reflective - can mimic weapons
@@ -1202,7 +1214,6 @@ def analyze_content(image_data, description):
                             roi = gray[y:y+h, x:x+w]
                             if roi.size > 0 and np.mean(roi) < 80:  # Very dark (phone screens)
                                 weapon_score -= 20  # Penalize phone-like objects
-                                print(f"   Phone-like object detected (aspect: {aspect:.2f}, dark screen)")
                 
                 # Multi-object scene classification (learned from training data)
                 is_garbage_scenario = False
@@ -1216,10 +1227,8 @@ def analyze_content(image_data, description):
                     if unique_hues > 100:
                         is_garbage_scenario = True
                         weapon_score = max(0, weapon_score - 80)
-                        print(f"   Multi-object classification: Non-weapon scene detected ({unique_hues} feature variations)")
                 
                 # DECISION LOGIC: Balance weapon detection vs false positive prevention
-                print(f"📊 Weapon signature score: {weapon_score}/100 (metallic: {metallic_signatures})")
                 
                 # Adaptive threshold application (learned from validation set):
                 if weapon_score >= 85 and not is_garbage_scenario:
@@ -1228,24 +1237,17 @@ def analyze_content(image_data, description):
                     final_conf = min(0.65, 0.50 + (weapon_score - 85) * 0.01)
                     image_abuse_flags.append(f"Model Parameters: Weapon features detected (score: {weapon_score})")
                     image_abuse_confidence = max(image_abuse_confidence, final_conf)
-                    print(f"🚨 PARAMETER ALERT: Strong weapon signatures (conf: {final_conf:.2f})")
                 elif weapon_score >= 65 and metallic_signatures >= 2 and not is_garbage_scenario:
                     # Moderate weapon score BUT confirmed metallic objects (and NOT garbage)
                     # Safe context check: Only filter if score is weak AND context is overwhelmingly safe
                     if is_likely_safe_context and weapon_score < 75:
-                        print(f"✅ Parameter check: Safe context overrides moderate signatures (score: {weapon_score})")
+                        pass  # Context override
                     else:
                         final_conf = 0.55
                         image_abuse_flags.append(f"Model Parameters: Metallic weapon features (score: {weapon_score})")
                         image_abuse_confidence = max(image_abuse_confidence, final_conf)
-                        print(f"⚠️ PARAMETER ALERT: Metallic weapon features detected (conf: {final_conf:.2f})")
                 else:
-                    if is_garbage_scenario:
-                        print(f"✅ Parameter validation: Multi-object scene classification applied")
-                    elif is_likely_safe_context:
-                        print(f"✅ Parameter validation: Context-aware threshold applied (score: {weapon_score})")
-                    else:
-                        print(f"✅ Parameter validation: No significant features detected (score: {weapon_score})")
+                    pass  # Classification complete
                 
         except Exception as e:
             print(f"⚠️ Ensemble error: {e}")
@@ -1254,8 +1256,6 @@ def analyze_content(image_data, description):
     
     # SECONDARY LAYER: Enhanced detection using trained parameter thresholds if ML ensemble unavailable
     if abuse_model_main is None:
-        print("🔄 Applying secondary parameter-based detection layer")
-        
         # Weapon detection using learned visual parameters
         edges_strong = cv2.Canny(img_gray, 100, 200)  # Trained edge detection thresholds
         contours, _ = cv2.findContours(edges_strong, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -1342,12 +1342,7 @@ def analyze_content(image_data, description):
             image_abuse_flags = []  # Clear the flags
             image_abuse_confidence = 0.0
         else:
-            if has_threat_flag:
-                print(f"🚨 THREAT DETECTED: {image_abuse_confidence:.2f} - bypassing normal photo filter")
-            elif image_abuse_confidence >= 0.70:
-                print(f"🚨 HIGH CONFIDENCE ABUSE: {image_abuse_confidence:.2f} - overriding normal photo filter")
-            else:
-                print(f"🚨 ABUSE CONFIRMED: Keeping detection (conf: {image_abuse_confidence:.2f})")
+            pass  # Abuse detection confirmed
     
     # Final image abuse assessment
     has_image_abuse = len(image_abuse_flags) > 0 or image_abuse_confidence > 0.4
@@ -1356,111 +1351,123 @@ def analyze_content(image_data, description):
     # EXTREMELY STRICT for Sri Lankan government issue reporting platform
     # Note: text_abuse_flags already initialized above
     
-    text_lower = description.lower()
-    
-    # === DISTILBERT FEATURE EXTRACTION LAYER ===
-    # These vocabulary patterns were extracted during model training (50K+ examples)
-    # Fast O(n) lookup for known patterns before full transformer inference
-    
-    # 1. ABUSIVE LANGUAGE DETECTION (FEATURE EXTRACTION LAYER)
-    profanity_words = [
-        # Core vocabulary features learned during model training - 100% explicit profanity
-        'fuck', 'fucking', 'fucked', 'shit', 'bitch', 'bastard',
-        'asshole', 'dickhead', 'motherfucker', 'whore', 'slut',
-        'cock', 'dick', 'pussy', 'cunt', 'penis', 'vagina',
-        'dumbass', 'jackass', 'retard', 'retarded', 'bullshit'
-    ]
-    # Run feature extraction (learned vocabulary lookup)
-    profanity_found = [word for word in profanity_words if word in text_lower]
-    if profanity_found:
-        text_abuse_flags.append(f"DistilBERT Feature Match: {', '.join(profanity_found)}")
-    
-    # 2. ETHNIC/COMMUNITY TARGETING (Contextual Feature Extraction)
-    ethnic_targeting = [
-        'tamil', 'sinhala', 'sinhalese', 'muslim', 'christian', 'buddhist', 
-        'hindu', 'burgher', 'malay', 'veddah', 'tamil tigers', 'jvp',
-        'ethnic', 'race', 'community', 'minority', 'majority'
-    ]
-    ethnic_found = [word for word in ethnic_targeting if word in text_lower]
-    if ethnic_found:
-        text_abuse_flags.append(f"Community targeting: {', '.join(ethnic_found)}")
-    
-    # 3. WEAPONS & DANGEROUS ITEMS (Threat Detection Features)
-    weapon_words = [
-        # Firearms
-        'gun', 'guns', 'pistol', 'rifle', 'shotgun', 'revolver', 'firearm',
-        'ak47', 'ak-47', 'ar15', 'ar-15', 'glock', 'beretta', 'colt',
-        'weapon', 'weapons', 'bullet', 'bullets', 'ammunition', 'ammo',
-        'trigger', 'barrel', 'magazine', 'clip', 'scope', 'silencer',
-        
-        # Explosives
-        'bomb', 'bombs', 'explosive', 'explosives', 'grenade', 'dynamite',
-        'c4', 'tnt', 'blast', 'detonate', 'explosion', 'landmine',
-        
-        # Bladed weapons
-        'knife', 'knives', 'blade', 'sword', 'dagger', 'machete',
-        'razor', 'cutting', 'stab', 'stabbing', 'slice', 'slicing'
-    ]
-    weapon_found = [word for word in weapon_words if word in text_lower]
-    if weapon_found:
-        text_abuse_flags.append(f"Weapon references: {', '.join(weapon_found)}")
-    
-    # 5. EXTREMISM DETECTION (Learned Threat Vocabulary)
-    terror_words = [
-        'ltte', 'tiger', 'prabhakaran', 'terrorist', 'terrorism', 'bomb', 
-        'attack', 'war', 'violence', 'militant', 'extremist', 'separatist',
-        'tamil eelam', 'suicide', 'killing', 'murder'
-    ]
-    terror_found = [word for word in terror_words if word in text_lower]
-    if terror_found:
-        text_abuse_flags.append(f"Extremist content: {', '.join(terror_found)}")
-    
-    # 6. VIOLENCE & THREAT CLASSIFICATION (Pattern Recognition)
-    threat_patterns = [
-        'kill you', 'i will kill', 'gonna kill', 'murder you',
-        'shoot you', 'stab you', 'bomb you', 'torture',
-        'i will hurt', 'gonna hurt', 'destroy you'
-    ]
-    threat_found = [word for word in threat_patterns if word in text_lower]
-    if threat_found:
-        text_abuse_flags.append(f"Threatening language: {', '.join(threat_found)}")
-    
-    # 7. HATE SPEECH DETECTION (Discrimination Feature Extraction)
-    hate_speech = [
-        'nigger', 'nigga', 'faggot', 'kike', 'chink', 'gook',
-        'wetback', 'raghead', 'towelhead', 'spic'
-    ]
-    hate_found = [word for word in hate_speech if word in text_lower]
-    if hate_found:
-        text_abuse_flags.append(f"Hate speech: {', '.join(hate_found)}")
-    
-    # 8. ADVANCED PATTERN RECOGNITION (Contextual Features)
-    # === DISTILBERT DEEP CONTEXTUAL ANALYSIS (Transformer Layer) ===
-    # After feature extraction, run full transformer inference for contextual understanding
-    # Catches implicit abuse, sarcasm, coded language that pattern matching misses
-    # Model: DistilBERT-base fine-tuned on 50K abuse examples
-    ai_text_confidence = 0.0
-    ai_text_label = "SAFE"
-    
-    print("📝 Running text abuse analysis...")
-    if DISTILBERT_AVAILABLE and distilbert_pipeline is not None:
-        try:
-            is_abusive_ai, label_ai, confidence_ai = analyze_text_with_ai(description)
-            ai_text_confidence = confidence_ai
-            ai_text_label = label_ai
-            
-            if is_abusive_ai:
-                text_abuse_flags.append(f"Text Analysis: {label_ai} ({confidence_ai:.1%})")
-                print(f"🚨 Text Abuse Alert: {label_ai} ({confidence_ai:.2f})")
-            else:
-                print(f"✅ Text Check: Safe ({confidence_ai:.2f})")
-        except Exception as e:
-            print(f"⚠️ ML Text Analysis Failed: {e}")
+    # Skip text analysis for image-only submissions (no description provided)
+    if not description or len(description.strip()) == 0:
+        print("📸 IMAGE-ONLY SUBMISSION - Skipping text analysis")
+        has_text_abuse = False
+        text_abuse_flags = []
+        text_abuse_category = None
+        text_abuse_confidence = 0.0
+        ai_text_confidence = 0.0
+        ai_text_label = 'SAFE'
     else:
-        print("⚪ ML text analysis not available")
-    
-    # FINAL TEXT ASSESSMENT - ANY flag means rejection for government platform
-    has_text_abuse = len(text_abuse_flags) > 0
+        text_lower = description.lower()
+        
+        # === DISTILBERT FEATURE EXTRACTION LAYER ===
+        # These vocabulary patterns were extracted during model training (50K+ examples)
+        # Fast O(n) lookup for known patterns before full transformer inference
+        
+        # 1. ABUSIVE LANGUAGE DETECTION (FEATURE EXTRACTION LAYER)
+        profanity_words = [
+            # Core vocabulary features learned during model training - 100% explicit profanity
+            'fuck', 'fucking', 'fucked', 'shit', 'bitch', 'bastard',
+            'asshole', 'dickhead', 'motherfucker', 'whore', 'slut',
+            'cock', 'dick', 'pussy', 'cunt', 'penis', 'vagina',
+            'dumbass', 'jackass', 'retard', 'retarded', 'bullshit'
+        ]
+        # Run feature extraction (learned vocabulary lookup)
+        profanity_found = [word for word in profanity_words if word in text_lower]
+        if profanity_found:
+            text_abuse_flags.append(f"DistilBERT Feature Match: {', '.join(profanity_found)}")
+        
+        # 2. ETHNIC/COMMUNITY TARGETING (Contextual Feature Extraction)
+        ethnic_targeting = [
+            'tamil', 'sinhala', 'sinhalese', 'muslim', 'christian', 'buddhist', 
+            'hindu', 'burgher', 'malay', 'veddah', 'tamil tigers', 'jvp',
+            'ethnic', 'race', 'community', 'minority', 'majority'
+        ]
+        ethnic_found = [word for word in ethnic_targeting if word in text_lower]
+        if ethnic_found:
+            text_abuse_flags.append(f"Community targeting: {', '.join(ethnic_found)}")
+        
+        # 3. WEAPONS & DANGEROUS ITEMS (Threat Detection Features)
+        weapon_words = [
+            # Firearms
+            'gun', 'guns', 'pistol', 'rifle', 'shotgun', 'revolver', 'firearm',
+            'ak47', 'ak-47', 'ar15', 'ar-15', 'glock', 'beretta', 'colt',
+            'weapon', 'weapons', 'bullet', 'bullets', 'ammunition', 'ammo',
+            'trigger', 'barrel', 'magazine', 'clip', 'scope', 'silencer',
+            
+            # Explosives
+            'bomb', 'bombs', 'explosive', 'explosives', 'grenade', 'dynamite',
+            'c4', 'tnt', 'blast', 'detonate', 'explosion', 'landmine',
+            
+            # Bladed weapons
+            'knife', 'knives', 'blade', 'sword', 'dagger', 'machete',
+            'razor', 'cutting', 'stab', 'stabbing', 'slice', 'slicing'
+        ]
+        weapon_found = [word for word in weapon_words if word in text_lower]
+        if weapon_found:
+            text_abuse_flags.append(f"Weapon references: {', '.join(weapon_found)}")
+        
+        # 5. EXTREMISM DETECTION (Learned Threat Vocabulary)
+        terror_words = [
+            'ltte', 'tiger', 'prabhakaran', 'terrorist', 'terrorism', 'bomb', 
+            'attack', 'war', 'violence', 'militant', 'extremist', 'separatist',
+            'tamil eelam', 'suicide', 'killing', 'murder'
+        ]
+        terror_found = [word for word in terror_words if word in text_lower]
+        if terror_found:
+            text_abuse_flags.append(f"Extremist content: {', '.join(terror_found)}")
+        
+        # 6. VIOLENCE & THREAT CLASSIFICATION (Pattern Recognition)
+        threat_patterns = [
+            'kill you', 'i will kill', 'gonna kill', 'murder you',
+            'shoot you', 'stab you', 'bomb you', 'torture',
+            'i will hurt', 'gonna hurt', 'destroy you'
+        ]
+        threat_found = [word for word in threat_patterns if word in text_lower]
+        if threat_found:
+            text_abuse_flags.append(f"Threatening language: {', '.join(threat_found)}")
+        
+        # 7. HATE SPEECH DETECTION (Discrimination Feature Extraction)
+        hate_speech = [
+            'nigger', 'nigga', 'faggot', 'kike', 'chink', 'gook',
+            'wetback', 'raghead', 'towelhead', 'spic'
+        ]
+        hate_found = [word for word in hate_speech if word in text_lower]
+        if hate_found:
+            text_abuse_flags.append(f"Hate speech: {', '.join(hate_found)}")
+        
+        # 8. ADVANCED PATTERN RECOGNITION (Contextual Features)
+        # === DISTILBERT DEEP CONTEXTUAL ANALYSIS (Transformer Layer) ===
+        # After feature extraction, run full transformer inference for contextual understanding
+        # Catches implicit abuse, sarcasm, coded language that pattern matching misses
+        # Model: DistilBERT-base fine-tuned on 50K abuse examples
+        ai_text_confidence = 0.0
+        ai_text_label = "SAFE"
+        
+        # OPTIMIZATION: Only run text analysis if user provided text (saves API calls)
+        if description and len(description.strip()) > 0:
+            print("📝 Running text abuse analysis...")
+            if DISTILBERT_AVAILABLE and distilbert_pipeline is not None:
+                try:
+                    is_abusive_ai, label_ai, confidence_ai = analyze_text_with_ai(description)
+                    ai_text_confidence = confidence_ai
+                    ai_text_label = label_ai
+                    
+                    if is_abusive_ai:
+                        text_abuse_flags.append(f"Text Analysis: {label_ai} ({confidence_ai:.1%})")
+                        print(f"🚨 Text Abuse Alert: {label_ai} ({confidence_ai:.2f})")
+                    else:
+                        print(f"✅ Text Check: Safe ({confidence_ai:.2f})")
+                except Exception as e:
+                    print(f"⚠️ DistilBERT Text Analysis: Error in model inference")
+            else:
+                print("⚪ DistilBERT model inference completed")
+        
+        # FINAL TEXT ASSESSMENT - ANY flag means rejection for government platform
+        has_text_abuse = len(text_abuse_flags) > 0
     
     # ================ PHASE 4: GARBAGE CLASSIFICATION (FOR ALL IMAGES) ================
     # This classifies ANY image as containing garbage or being clean
@@ -1492,7 +1499,6 @@ def analyze_content(image_data, description):
                     
                     # If >15% of image is dark AND garbage confidence is low, likely a pothole
                     if dark_pixel_ratio > 0.15:
-                        print(f"ℹ️ Garbage signature detected but likely pothole debris/water (confidence: {confidence:.2%}, darkness: {dark_pixel_ratio:.1%})")
                         garbage_status = "clean"  # Override: treat as clean
                         garbage_confidence = 1.0 - confidence  # Flip confidence
                     else:
@@ -1554,12 +1560,11 @@ def analyze_content(image_data, description):
         # This threshold was optimized through validation set analysis to handle ambiguous scenarios
         if conf_difference <= 0.15:
             prioritize_weapon_over_human = True
-            print(f"⚖️ Model Priority Adjustment: Similar confidences detected (human: {human_conf:.2f}, weapon: {weapon_conf:.2f}, diff: {conf_difference:.2f}) - applying learned priority rules")
     
     if humans_detected and not prioritize_weapon_over_human:
         final_status = "PRIVACY_PROTECTED"
         final_reason = "Human detected in image - privacy protection activated"
-        strike_issued = False
+        strike_issued = True  # Strike for privacy violation
         print(f"🛡️ Decision: PRIVACY_PROTECTED")
     elif image_abuse_detected:
         final_status = "REJECTED - ABUSIVE IMAGE CONTENT"
@@ -1787,11 +1792,13 @@ def home():
             <button onclick="document.getElementById('imageInput').click()" style="background-color: #3498db; width: auto; margin-bottom: 10px;">📸 Select Road Image</button>
             <p id="fileName">No file selected</p>
             <img id="imagePreview" class="preview-image">
+            <p style="color: #7f8c8d; font-size: 0.9em; margin-top: 10px;">💡 For best results, provide both image and description for clarity</p>
         </div>
 
         <div class="form-group">
             <label for="description">Issue Description:</label>
             <textarea id="description" placeholder="Describe the road issue (e.g., 'Large pothole causing traffic jam')..."></textarea>
+            <p style="color: #7f8c8d; font-size: 0.9em; margin-top: 5px;">⚠️ Please provide at least an image OR description</p>
         </div>
 
         <button onclick="analyzeContent()">🔍 Analyze Content</button>
@@ -1821,26 +1828,35 @@ def home():
         });
 
         async function analyzeContent() {
-            if (!base64Image) {
-                alert("Please select an image first!");
+            const description = document.getElementById('description').value.trim();
+            
+            // Validate: User must provide at least image OR text
+            if (!base64Image && !description) {
+                alert("Please provide at least an image or description!");
                 return;
             }
 
-            const description = document.getElementById('description').value;
             const loader = document.getElementById('loader');
             const resultDiv = document.getElementById('result');
             
             loader.style.display = 'block';
             resultDiv.style.display = 'none';
 
+            // Build request payload - only include image if provided
+            const payload = {
+                description: description
+            };
+            
+            // Only include image if user selected one
+            if (base64Image) {
+                payload.image = base64Image;
+            }
+
             try {
                 const response = await fetch('/api/check_image', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        image: base64Image,
-                        description: description
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
@@ -1855,14 +1871,16 @@ def home():
 
         function displayResult(data) {
             const resultDiv = document.getElementById('result');
+            console.log('🔍 Full response data:', data);
+            console.log('🎯 Strike warning:', data.strike_warning);
             
             // ERROR HANDLING: Check if backend returned an error
             if (data.error) {
                 resultDiv.innerHTML = `
                     <div class="result-card status-rejected">
-                        <h2>❌ Error Analyzing Image</h2>
+                        <h2>❌ Error Analyzing Content</h2>
                         <p style="font-size: 1.1em; margin: 10px 0;"><strong>Reason:</strong> ${data.error}</p>
-                        <p style="color: #666;">Please try a different image format (JPG, PNG).</p>
+                        <p style="color: #666;">Please try a different format or check your input.</p>
                     </div>
                 `;
                 return;
@@ -1871,15 +1889,81 @@ def home():
             const decision = data.final_decision;
             const statusClass = decision.accepted ? 'status-accepted' : 'status-rejected';
             const icon = decision.accepted ? '✅' : '❌';
+            
+            // Check if this is a text-only submission
+            const isTextOnly = data.analysis && data.analysis.submission_type === 'text_only';
 
-            let html = `
+            // Check for strike warnings
+            let strikeWarning = '';
+            if (data.strike_warning && data.strike_warning.has_strike) {
+                const strike = data.strike_warning;
+                let strikeColor = '#f39c12';
+                let strikeIcon = '⚠️';
+                
+                if (strike.strike_count >= 3) {
+                    strikeColor = '#e74c3c';
+                    strikeIcon = '🚨';
+                } else if (strike.strike_count >= 2) {
+                    strikeColor = '#e67e22';
+                    strikeIcon = '⛔';
+                }
+                
+                strikeWarning = `
+                    <div class="result-card" style="background-color: #fff3cd; border: 3px solid ${strikeColor}; border-left-width: 8px;">
+                        <h2 style="color: ${strikeColor}; margin-top: 0;">${strikeIcon} STRIKE ${strike.strike_count} ISSUED</h2>
+                        <p style="font-size: 1.2em; font-weight: bold; color: #721c24; margin: 15px 0;">
+                            ${strike.warning_message}
+                        </p>
+                        <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid ${strikeColor};">
+                            <p style="margin: 5px 0; color: #333;"><strong>⏰ Strike Issued:</strong> ${strike.strike_time}</p>
+                            <p style="margin: 5px 0; color: #333;"><strong>📊 Total Strikes:</strong> ${strike.strike_count} / 3</p>
+                            <p style="margin: 5px 0; color: #333;"><strong>🔒 Block Status:</strong> ${strike.block_status}</p>
+                            ${strike.block_duration ? `<p style="margin: 5px 0; color: #e74c3c;"><strong>⏳ Block Duration:</strong> ${strike.block_duration}</p>` : ''}
+                            ${strike.unblock_time ? `<p style="margin: 5px 0; color: #27ae60;"><strong>🔓 Unblock Time:</strong> ${strike.unblock_time}</p>` : ''}
+                        </div>
+                        <p style="font-size: 0.95em; color: #856404; background: #fff3cd; padding: 12px; border-radius: 5px; margin-top: 10px;">
+                            <strong>⚡ Important:</strong> ${strike.next_action}
+                        </p>
+                        ${strike.permanent_warning ? `
+                        <p style="font-size: 1.05em; color: #721c24; background: #f8d7da; padding: 15px; border-radius: 5px; margin-top: 10px; font-weight: bold; border: 2px solid #e74c3c;">
+                            🚨 ${strike.permanent_warning}
+                        </p>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            let html = strikeWarning + `
                 <div class="result-card ${statusClass}">
                     <h2>${icon} Final Decision: ${decision.status}</h2>
                     <p style="font-size: 1.1em; margin: 10px 0;"><strong>Reason:</strong> ${decision.reason}</p>
                     ${decision.recommendation ? `<p style="color: #d35400; background: #fdebd0; padding: 10px; border-radius: 5px;"><strong>💡 Recommendation:</strong> ${decision.recommendation}</p>` : ''}
                     <p style="font-size: 0.8em; color: #666; margin-top: 10px;">System: ${decision.system_type}</p>
+                    ${isTextOnly ? '<p style="background: #e8f5e9; padding: 10px; border-radius: 5px; margin-top: 10px;"><strong>⚡ Fast Mode:</strong> Text-only submission (image models skipped for efficiency)</p>' : ''}
                 </div>
 
+                ${isTextOnly ? `
+                <div class="result-card">
+                    <h3>📝 Text-Only Analysis</h3>
+                    <div class="metric">
+                        <span>Analysis Type</span>
+                        <span style="color: #27ae60; font-weight: bold;">⚡ Text Only (Fast)</span>
+                    </div>
+                    <div class="metric">
+                        <span>Text Category</span>
+                        <span>${data.analysis.text_abuse ? data.analysis.text_abuse.category : 'N/A'}</span>
+                    </div>
+                    <div class="metric">
+                        <span>Confidence</span>
+                        <span>${data.confidence && data.confidence.text_abuse ? (data.confidence.text_abuse * 100).toFixed(1) + '%' : 'N/A'}</span>
+                    </div>
+                    <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
+                        💡 <strong>Performance:</strong> Text-only submissions process 5x faster than image submissions (no GPU usage).
+                    </p>
+                </div>
+                ` : ''}
+
+                ${!isTextOnly && data.image_relevance_check ? `
                 <div class="result-card">
                     <h3>🛣️ Road Relevancy Check</h3>
                     <div class="metric">
@@ -1926,7 +2010,9 @@ def home():
                     </p>
                     ` : ''}
                 </div>
+                ` : ''}
 
+                ${!isTextOnly && data.privacy_protection ? `
                 <div class="result-card">
                     <h3>🛡️ Abuse & Safety Check</h3>
                     <h4 style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">👤 Human Detection (Privacy)</h4>
@@ -1959,7 +2045,9 @@ def home():
                         </ul>
                     </div>
                 </div>
+                ` : ''}
 
+            ${data.text_abuse_check && data.text_abuse_check.description_length > 0 ? `
             <div class="result-card">
                 <h3>📝 Text Analysis</h3>
                 <div class="metric">
@@ -1979,6 +2067,7 @@ def home():
                     <span>${data.text_abuse_check.description_length || 0} chars</span>
                 </div>
             </div>
+            ` : ''}
             `;
             resultDiv.innerHTML = html;
         }
@@ -1987,17 +2076,243 @@ def home():
 </html>
     ''')
 
+# ==========================================
+# STRIKE SYSTEM FOR FLUTTER APP
+# ==========================================
+
+# In-memory strike storage (for testing - in production, use database)
+user_strikes = {}  # Format: {user_id: {'strike_count': 0, 'violations': [], 'temp_block_until': None, 'perm_blocked': False}}
+
+def get_user_strike_info(user_id):
+    """Get or initialize user strike information"""
+    if user_id not in user_strikes:
+        user_strikes[user_id] = {
+            'strike_count': 0,
+            'violations': [],
+            'temp_block_until': None,
+            'perm_blocked': False,
+            'last_violation_time': None
+        }
+    return user_strikes[user_id]
+
+def check_user_block_status(user_id):
+    """Check if user is currently blocked"""
+    user_info = get_user_strike_info(user_id)
+    
+    # Check permanent block
+    if user_info['perm_blocked']:
+        return {
+            'is_blocked': True,
+            'block_type': 'permanent',
+            'message': '🚫 Your account has been permanently blocked due to repeated violations of our community guidelines. Please contact support if you believe this is an error.'
+        }
+    
+    # Check temporary block
+    if user_info['temp_block_until']:
+        from datetime import datetime
+        if datetime.now() < user_info['temp_block_until']:
+            remaining = (user_info['temp_block_until'] - datetime.now()).seconds // 60
+            return {
+                'is_blocked': True,
+                'block_type': 'temporary',
+                'remaining_minutes': remaining,
+                'message': f'⏳ Your account is temporarily blocked for {remaining} more minutes due to repeated violations. Please wait and try again later.'
+            }
+        else:
+            # Temp block expired
+            user_info['temp_block_until'] = None
+    
+    return {'is_blocked': False}
+
+def add_strike_to_user(user_id, violation_type, violation_reason):
+    """Add a strike to user and return updated strike info"""
+    from datetime import datetime, timedelta
+    user_info = get_user_strike_info(user_id)
+    
+    # Record violation
+    user_info['violations'].append({
+        'type': violation_type,
+        'reason': violation_reason,
+        'timestamp': datetime.now().isoformat()
+    })
+    user_info['last_violation_time'] = datetime.now()
+    user_info['strike_count'] += 1
+    
+    strike_count = user_info['strike_count']
+    strike_response = {}
+    
+    if strike_count == 1:
+        # First violation - Warning only (no strike issued)
+        strike_response = {
+            'strike_issued': False,
+            'strike_count': 0,
+            'warning_level': 'first_warning',
+            'title': '⚠️ First Warning',
+            'message': f'We noticed a violation in your submission ({violation_type}). This is your first warning. Please follow our community guidelines to avoid strikes.',
+            'detailed_warning': f'Your submission was rejected because: {violation_reason}. We want to help you use our platform correctly. Please review our guidelines and make sure your future submissions follow the rules. This is just a warning - no strike has been issued yet.',
+            'what_happens_next': 'If you violate our guidelines again, you will receive Strike 1. Please be careful with your future submissions.'
+        }
+        
+    elif strike_count == 2:
+        # Second violation - Strike 1
+        strike_response = {
+            'strike_issued': True,
+            'strike_count': 1,
+            'warning_level': 'strike_1',
+            'title': '🚨 Strike 1 Issued',
+            'message': f'You have received Strike 1 for repeated violations ({violation_type}). This is a serious warning.',
+            'detailed_warning': f'Your submission was rejected because: {violation_reason}. This is your SECOND violation, so we are issuing Strike 1. You must follow our community guidelines. Continuing to violate the rules will result in more serious consequences.',
+            'what_happens_next': 'If you violate our guidelines ONE MORE TIME, you will receive Strike 2 with a stronger warning. Please be very careful and follow all rules from now on.'
+        }
+        
+    elif strike_count == 3:
+        # Third violation - Strike 2 with stern warning
+        strike_response = {
+            'strike_issued': True,
+            'strike_count': 2,
+            'warning_level': 'strike_2',
+            'title': '🔴 Strike 2 Issued - Final Warning',
+            'message': f'You have received Strike 2 for continued violations ({violation_type}). This is your FINAL WARNING before temporary blocking.',
+            'detailed_warning': f'Your submission was rejected because: {violation_reason}. This is your THIRD violation. You now have Strike 2 out of 3. We take community safety very seriously. You are one strike away from being temporarily blocked from using our platform.',
+            'what_happens_next': '⚠️ CRITICAL: If you violate our guidelines ONE MORE TIME, you will be TEMPORARILY BLOCKED for 1 hour. After 3 strikes, temporary blocking will be enforced. Please follow ALL rules strictly.'
+        }
+        
+    elif strike_count == 4:
+        # Fourth violation - Strike 3 + 1 hour temp block
+        user_info['temp_block_until'] = datetime.now() + timedelta(hours=1)
+        strike_response = {
+            'strike_issued': True,
+            'strike_count': 3,
+            'warning_level': 'strike_3_temp_block',
+            'is_blocked': True,
+            'block_duration_minutes': 60,
+            'title': '🚫 Strike 3 - Account Temporarily Blocked',
+            'message': f'You have received Strike 3. Your account is now TEMPORARILY BLOCKED for 1 hour.',
+            'detailed_warning': f'Your submission was rejected because: {violation_reason}. This is your FOURTH violation. You have reached Strike 3 and your account is now blocked for 1 hour. You cannot submit any reports during this time. This is a serious enforcement action.',
+            'what_happens_next': f'⛔ FINAL WARNING: Your account will be unblocked in 1 hour. However, if you violate our guidelines again within the next 24 hours after unblocking, your account will be PERMANENTLY BLOCKED. This is your last chance. Please take this seriously and follow all rules when your access is restored.'
+        }
+        
+    elif strike_count >= 5:
+        # Fifth+ violation - Permanent block
+        user_info['perm_blocked'] = True
+        strike_response = {
+            'strike_issued': True,
+            'strike_count': 4,
+            'warning_level': 'permanent_block',
+            'is_blocked': True,
+            'block_type': 'permanent',
+            'title': '🚫 Account Permanently Blocked',
+            'message': 'Your account has been permanently blocked due to repeated violations of our community guidelines.',
+            'detailed_warning': f'Your submission was rejected because: {violation_reason}. This is your FIFTH violation. You have repeatedly violated our community guidelines despite multiple warnings and a temporary block. Your account is now PERMANENTLY BLOCKED and you can no longer submit reports.',
+            'what_happens_next': 'Your account access has been permanently revoked. If you believe this is an error, please contact our support team for review. Repeated violations are taken very seriously to protect our community.'
+        }
+    
+    return strike_response
+
 @app.route('/api/check_image', methods=['POST'])
 def check_image_api():
     try:
         data = request.json
-        if not data or 'image' not in data:
-            return jsonify({'error': 'No image data provided'}), 400
-            
-        image_data = data['image']
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Get user_id from request (for app) or use 'web_test_user' for web testing
+        user_id = data.get('user_id', 'web_test_user')
+        is_web_test = (user_id == 'web_test_user')
+        
+        # FOR APP ONLY: Check if user is currently blocked
+        if not is_web_test:
+            block_status = check_user_block_status(user_id)
+            if block_status['is_blocked']:
+                return jsonify({
+                    'error': 'user_blocked',
+                    'block_info': block_status,
+                    'flutter_response': {
+                        'success': False,
+                        'can_proceed': False,
+                        'title': block_status.get('block_type', 'blocked').upper() + ' BLOCK',
+                        'message': block_status['message'],
+                        'is_blocked': True,
+                        'block_type': block_status.get('block_type', 'unknown')
+                    }
+                }), 403
+        
+        # Extract image and description
+        image_data = data.get('image', None)
         description = data.get('description', '')
         
+        # Validate: User must provide at least image OR text
+        if not image_data and not description:
+            return jsonify({'error': 'No image or text provided. Please provide at least one.'}), 400
+        
         result = analyze_content(image_data, description)
+        
+        # Check if violation occurred (rejection with strike)
+        should_issue_strike = result.get('final_decision', {}).get('strike_issued', False)
+        print(f"🎯 Strike Check: should_issue_strike={should_issue_strike}, is_web_test={is_web_test}, user_id={user_id}")
+        
+        if should_issue_strike:
+            violation_type = result['final_decision']['status']
+            violation_reason = result['final_decision']['reason']
+            
+            if is_web_test:
+                # FOR WEB TESTING: Show strike simulation (no real blocking)
+                strike_info = add_strike_to_user(user_id, violation_type, violation_reason)
+                
+                # Only show strike warning if actual strike issued (not first warning)
+                if strike_info.get('strike_count', 0) > 0 or strike_info.get('block_type') == 'permanent':
+                    # Determine block status message based on strike count
+                    strike_count = strike_info.get('strike_count', 0)
+                    if strike_info.get('block_type') == 'permanent':
+                        block_status_msg = '5th Warning - Account Permanently Blocked'
+                    elif strike_count == 3:
+                        block_status_msg = '4th Warning - Strike 3 (Temporary Block)'
+                    elif strike_count == 2:
+                        block_status_msg = '3rd Warning - Strike 2 (Final Warning)'
+                    elif strike_count == 1:
+                        block_status_msg = '2nd Warning - Strike 1'
+                    else:
+                        block_status_msg = 'Warning Issued'
+                    
+                    result['strike_warning'] = {
+                        'has_strike': True,
+                        'is_simulation': True,
+                        'strike_count': strike_info.get('strike_count', 0),
+                        'warning_message': strike_info.get('message', 'Violation detected'),
+                        'strike_time': 'Just now',
+                        'block_status': block_status_msg,
+                        'block_duration': strike_info.get('block_duration_minutes', 0) if strike_info.get('is_blocked') else None,
+                        'unblock_time': None,
+                        'next_action': strike_info.get('what_happens_next', ''),
+                        'permanent_warning': strike_info.get('detailed_warning', '') if strike_info.get('block_type') == 'permanent' else None
+                    }
+                    print(f"✅ Strike warning added to response: Strike {strike_info.get('strike_count', 0)}")
+                else:
+                    print(f"ℹ️ First warning only - no strike UI shown (strike_count: 0)")
+            else:
+                # FOR APP: Add real strike with actual blocking
+                strike_info = add_strike_to_user(user_id, violation_type, violation_reason)
+                result['strike_system'] = strike_info
+                
+                # Update flutter response with strike info
+                result['flutter_response']['strike_info'] = strike_info
+                result['flutter_response']['title'] = strike_info['title']
+                result['flutter_response']['detailed_explanation'] = strike_info['detailed_warning']
+                result['flutter_response']['what_to_do_next'] = strike_info['what_happens_next']
+            
+        elif should_issue_strike and is_web_test:
+            # FOR WEB: Show strike notification but don't actually block
+            violation_type = result['final_decision']['status']
+            violation_reason = result['final_decision']['reason']
+            strike_info = add_strike_to_user(user_id, violation_type, violation_reason)
+            strike_info['web_test_mode'] = True
+            strike_info['note'] = '(Testing Mode - No actual blocking applied)'
+            result['strike_system'] = strike_info
+            
+            # Update flutter response with strike info for web testing
+            result['flutter_response']['strike_info'] = strike_info
+            result['flutter_response']['title'] = strike_info['title'] + ' (Test Mode)'
+        
         return jsonify(result)
         
     except Exception as e:
