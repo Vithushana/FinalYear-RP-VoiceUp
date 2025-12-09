@@ -461,21 +461,32 @@ def analyze_content(image_data, description):
     if not image_data and description and len(description.strip()) > 0:
         print("📝 TEXT-ONLY SUBMISSION DETECTED - Running text analysis only")
         
+        # Run only text abuse detection
+        text_abuse_detected = False
+        text_analysis = None
+        text_abuse_category = None
+        
         try:
-            # Run ONLY text abuse detection
-            text_analysis = analyze_text_with_ai(description)
-            text_abuse_detected = text_analysis.get('is_abuse', False)
-            text_abuse_category = text_analysis.get('category', 'UNKNOWN')
+            # Returns (is_abusive, category, confidence)
+            is_abusive, category, confidence = analyze_text_with_ai(description)
+            text_abuse_detected = is_abusive
+            text_abuse_category = category if category else 'UNKNOWN'
             
-            print(f"   📊 Text Analysis: {'ABUSE' if text_abuse_detected else 'SAFE'} ({text_abuse_category})")
+            print(f"🤖 Text Analysis: {'ABUSE' if text_abuse_detected else 'SAFE'} (confidence: {confidence:.2f}%)")
+            
+            text_analysis = {
+                'is_abuse': is_abusive,
+                'category': category,
+                'confidence': confidence
+            }
             
         except Exception as text_error:
             print(f"⚠️ Text analysis error: {text_error}")
-            # Fail-open: If text analysis fails, allow submission
+            # If text analysis fails, allow submission (fail-open for text-only)
             text_analysis = {'is_abuse': False, 'category': 'ERROR', 'confidence': 0.0}
             text_abuse_detected = False
         
-        # Return immediately - no image processing needed
+        # Final decision for text-only submission
         if text_abuse_detected:
             return {
                 'final_decision': {
@@ -485,19 +496,34 @@ def analyze_content(image_data, description):
                     'strike_issued': True,
                     'system_type': 'TEXT ABUSE DETECTION'
                 },
-                'analysis': {
-                    'text_abuse': text_analysis,
-                    'submission_type': 'text_only'  # Important flag for frontend!
-                }
+                'text_abuse_check': {
+                    'detected': text_abuse_detected,
+                    'flags': [text_abuse_category] if text_abuse_detected else [],
+                    'ai_powered': True,
+                    'ai_label': text_abuse_category,
+                    'ai_confidence': confidence,
+                    'description_length': len(description)
+                },
+                'submission_type': 'text_only'
             }
         else:
             return {
                 'final_decision': {
                     'status': 'ACCEPTED',
                     'accepted': True,
-                    'strike_issued': False
+                    'reason': 'Text-only submission passed abuse detection',
+                    'strike_issued': False,
+                    'system_type': 'TEXT ANALYSIS'
                 },
-                'analysis': {'submission_type': 'text_only'}
+                'text_abuse_check': {
+                    'detected': text_abuse_detected,
+                    'flags': [],
+                    'ai_powered': True,
+                    'ai_label': text_abuse_category,
+                    'ai_confidence': confidence,
+                    'description_length': len(description)
+                },
+                'submission_type': 'text_only'
             }
     
     # ================ IMAGE PROCESSING PATH ================
@@ -1106,13 +1132,18 @@ def analyze_content(image_data, description):
     
     # ================ PHASE 3: GOVERNMENT-LEVEL TEXT FILTERING ================
     # EXTREMELY STRICT for Sri Lankan government issue reporting platform
-    # Skip text analysis if no description provided (image-only submission)
+    # Note: text_abuse_flags already initialized above
     
+    # Skip text analysis for image-only submissions (no description provided)
     if not description or len(description.strip()) == 0:
         print("📸 IMAGE-ONLY SUBMISSION - Skipping text analysis")
         has_text_abuse = False
+        text_abuse_flags = []
+        text_abuse_category = None
+        text_abuse_confidence = 0.0
+        ai_text_confidence = 0.0
+        ai_text_label = 'SAFE'
     else:
-        # Note: text_abuse_flags already initialized above
         text_lower = description.lower()
         
         # === DISTILBERT FEATURE EXTRACTION LAYER ===
@@ -1121,9 +1152,9 @@ def analyze_content(image_data, description):
         
         # 1. ABUSIVE LANGUAGE DETECTION (FEATURE EXTRACTION LAYER)
         profanity_words = [
-        # Core vocabulary features learned during model training - 100% explicit profanity
-        'fuck', 'fucking', 'fucked', 'shit', 'bitch', 'bastard',
-        'asshole', 'dickhead', 'motherfucker', 'whore', 'slut',
+            # Core vocabulary features learned during model training - 100% explicit profanity
+            'fuck', 'fucking', 'fucked', 'shit', 'bitch', 'bastard',
+            'asshole', 'dickhead', 'motherfucker', 'whore', 'slut',
             'cock', 'dick', 'pussy', 'cunt', 'penis', 'vagina',
             'dumbass', 'jackass', 'retard', 'retarded', 'bullshit'
         ]
@@ -1141,78 +1172,78 @@ def analyze_content(image_data, description):
         ethnic_found = [word for word in ethnic_targeting if word in text_lower]
         if ethnic_found:
             text_abuse_flags.append(f"Community targeting: {', '.join(ethnic_found)}")
-    
-    # 3. WEAPONS & DANGEROUS ITEMS (Threat Detection Features)
-    weapon_words = [
-        # Firearms
-        'gun', 'guns', 'pistol', 'rifle', 'shotgun', 'revolver', 'firearm',
-        'ak47', 'ak-47', 'ar15', 'ar-15', 'glock', 'beretta', 'colt',
-        'weapon', 'weapons', 'bullet', 'bullets', 'ammunition', 'ammo',
-        'trigger', 'barrel', 'magazine', 'clip', 'scope', 'silencer',
         
-        # Explosives
-        'bomb', 'bombs', 'explosive', 'explosives', 'grenade', 'dynamite',
-        'c4', 'tnt', 'blast', 'detonate', 'explosion', 'landmine',
-        
-        # Bladed weapons
-        'knife', 'knives', 'blade', 'sword', 'dagger', 'machete',
-        'razor', 'cutting', 'stab', 'stabbing', 'slice', 'slicing'
-    ]
-    weapon_found = [word for word in weapon_words if word in text_lower]
-    if weapon_found:
-        text_abuse_flags.append(f"Weapon references: {', '.join(weapon_found)}")
-    
-    # 5. EXTREMISM DETECTION (Learned Threat Vocabulary)
-    terror_words = [
-        'ltte', 'tiger', 'prabhakaran', 'terrorist', 'terrorism', 'bomb', 
-        'attack', 'war', 'violence', 'militant', 'extremist', 'separatist',
-        'tamil eelam', 'suicide', 'killing', 'murder'
-    ]
-    terror_found = [word for word in terror_words if word in text_lower]
-    if terror_found:
-        text_abuse_flags.append(f"Extremist content: {', '.join(terror_found)}")
-    
-    # 6. VIOLENCE & THREAT CLASSIFICATION (Pattern Recognition)
-    threat_patterns = [
-        'kill you', 'i will kill', 'gonna kill', 'murder you',
-        'shoot you', 'stab you', 'bomb you', 'torture',
-        'i will hurt', 'gonna hurt', 'destroy you'
-    ]
-    threat_found = [word for word in threat_patterns if word in text_lower]
-    if threat_found:
-        text_abuse_flags.append(f"Threatening language: {', '.join(threat_found)}")
-    
-    # 7. HATE SPEECH DETECTION (Discrimination Feature Extraction)
-    hate_speech = [
-        'nigger', 'nigga', 'faggot', 'kike', 'chink', 'gook',
-        'wetback', 'raghead', 'towelhead', 'spic'
-    ]
-    hate_found = [word for word in hate_speech if word in text_lower]
-    if hate_found:
-        text_abuse_flags.append(f"Hate speech: {', '.join(hate_found)}")
-    
-    # 8. ADVANCED PATTERN RECOGNITION (Contextual Features)
-    # === DISTILBERT DEEP CONTEXTUAL ANALYSIS (Transformer Layer) ===
-    # After feature extraction, run full transformer inference for contextual understanding
-    # Catches implicit abuse, sarcasm, coded language that pattern matching misses
-    # Model: DistilBERT-base fine-tuned on 50K abuse examples
-    ai_text_confidence = 0.0
-    ai_text_label = "SAFE"
-    
-    print("📝 Running text abuse analysis...")
-    if DISTILBERT_AVAILABLE and distilbert_pipeline is not None:
-        try:
-            is_abusive_ai, label_ai, confidence_ai = analyze_text_with_ai(description)
-            ai_text_confidence = confidence_ai
-            ai_text_label = label_ai
+        # 3. WEAPONS & DANGEROUS ITEMS (Threat Detection Features)
+        weapon_words = [
+            # Firearms
+            'gun', 'guns', 'pistol', 'rifle', 'shotgun', 'revolver', 'firearm',
+            'ak47', 'ak-47', 'ar15', 'ar-15', 'glock', 'beretta', 'colt',
+            'weapon', 'weapons', 'bullet', 'bullets', 'ammunition', 'ammo',
+            'trigger', 'barrel', 'magazine', 'clip', 'scope', 'silencer',
             
-            if is_abusive_ai:
-                text_abuse_flags.append(f"Text Analysis: {label_ai} ({confidence_ai:.1%})")
-                print(f"🚨 Text Abuse Alert: {label_ai} ({confidence_ai:.2f})")
-            else:
-                print(f"✅ Text Check: Safe ({confidence_ai:.2f})")
-        except Exception as e:
-            print(f"⚠️ ML Text Analysis Failed: {e}")
+            # Explosives
+            'bomb', 'bombs', 'explosive', 'explosives', 'grenade', 'dynamite',
+            'c4', 'tnt', 'blast', 'detonate', 'explosion', 'landmine',
+            
+            # Bladed weapons
+            'knife', 'knives', 'blade', 'sword', 'dagger', 'machete',
+            'razor', 'cutting', 'stab', 'stabbing', 'slice', 'slicing'
+        ]
+        weapon_found = [word for word in weapon_words if word in text_lower]
+        if weapon_found:
+            text_abuse_flags.append(f"Weapon references: {', '.join(weapon_found)}")
+        
+        # 5. EXTREMISM DETECTION (Learned Threat Vocabulary)
+        terror_words = [
+            'ltte', 'tiger', 'prabhakaran', 'terrorist', 'terrorism', 'bomb', 
+            'attack', 'war', 'violence', 'militant', 'extremist', 'separatist',
+            'tamil eelam', 'suicide', 'killing', 'murder'
+        ]
+        terror_found = [word for word in terror_words if word in text_lower]
+        if terror_found:
+            text_abuse_flags.append(f"Extremist content: {', '.join(terror_found)}")
+        
+        # 6. VIOLENCE & THREAT CLASSIFICATION (Pattern Recognition)
+        threat_patterns = [
+            'kill you', 'i will kill', 'gonna kill', 'murder you',
+            'shoot you', 'stab you', 'bomb you', 'torture',
+            'i will hurt', 'gonna hurt', 'destroy you'
+        ]
+        threat_found = [word for word in threat_patterns if word in text_lower]
+        if threat_found:
+            text_abuse_flags.append(f"Threatening language: {', '.join(threat_found)}")
+        
+        # 7. HATE SPEECH DETECTION (Discrimination Feature Extraction)
+        hate_speech = [
+            'nigger', 'nigga', 'faggot', 'kike', 'chink', 'gook',
+            'wetback', 'raghead', 'towelhead', 'spic'
+        ]
+        hate_found = [word for word in hate_speech if word in text_lower]
+        if hate_found:
+            text_abuse_flags.append(f"Hate speech: {', '.join(hate_found)}")
+        
+        # 8. ADVANCED PATTERN RECOGNITION (Contextual Features)
+        # === DISTILBERT DEEP CONTEXTUAL ANALYSIS (Transformer Layer) ===
+        # After feature extraction, run full transformer inference for contextual understanding
+        # Catches implicit abuse, sarcasm, coded language that pattern matching misses
+        # Model: DistilBERT-base fine-tuned on 50K abuse examples
+        ai_text_confidence = 0.0
+        ai_text_label = "SAFE"
+        
+        print("📝 Running text abuse analysis...")
+        if DISTILBERT_AVAILABLE and distilbert_pipeline is not None:
+            try:
+                is_abusive_ai, label_ai, confidence_ai = analyze_text_with_ai(description)
+                ai_text_confidence = confidence_ai
+                ai_text_label = label_ai
+                
+                if is_abusive_ai:
+                    text_abuse_flags.append(f"Text Analysis: {label_ai} ({confidence_ai:.1%})")
+                    print(f"🚨 Text Abuse Alert: {label_ai} ({confidence_ai:.2f})")
+                else:
+                    print(f"✅ Text Check: Safe ({confidence_ai:.2f})")
+            except Exception as e:
+                print(f"⚠️ ML Text Analysis Failed: {e}")
         else:
             print("⚪ ML text analysis not available")
         
@@ -1524,11 +1555,13 @@ def home():
             <button onclick="document.getElementById('imageInput').click()" style="background-color: #3498db; width: auto; margin-bottom: 10px;">📸 Select Garbage Image</button>
             <p id="fileName">No file selected</p>
             <img id="imagePreview" class="preview-image">
+            <p style="color: #7f8c8d; font-size: 0.9em; margin-top: 10px;">💡 For best results, provide both image and description for clarity</p>
         </div>
 
         <div class="form-group">
             <label for="description">Issue Description:</label>
             <textarea id="description" placeholder="Describe the garbage issue (e.g., 'Illegal dumping site with plastic waste')..."></textarea>
+            <p style="color: #7f8c8d; font-size: 0.9em; margin-top: 5px;">⚠️ Please provide at least an image OR description</p>
         </div>
 
         <button onclick="analyzeContent()">🔍 Analyze Content</button>
@@ -1558,26 +1591,35 @@ def home():
         });
 
         async function analyzeContent() {
-            if (!base64Image) {
-                alert("Please select an image first!");
+            const description = document.getElementById('description').value.trim();
+            
+            // Validate: User must provide at least image OR text
+            if (!base64Image && !description) {
+                alert("Please provide at least an image or description!");
                 return;
             }
 
-            const description = document.getElementById('description').value;
             const loader = document.getElementById('loader');
             const resultDiv = document.getElementById('result');
             
             loader.style.display = 'block';
             resultDiv.style.display = 'none';
 
+            // Build request payload - only include image if provided
+            const payload = {
+                description: description
+            };
+            
+            // Only include image if user selected one
+            if (base64Image) {
+                payload.image = base64Image;
+            }
+
             try {
                 const response = await fetch('/api/check_image', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        image: base64Image,
-                        description: description
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
@@ -1608,6 +1650,9 @@ def home():
             const decision = data.final_decision;
             const statusClass = decision.accepted ? 'status-accepted' : 'status-rejected';
             const icon = decision.accepted ? '✅' : '❌';
+            
+            // Check if this is a text-only submission
+            const isTextOnly = data.analysis && data.analysis.submission_type === 'text_only';
 
             // Check for strike warnings
             let strikeWarning = '';
@@ -1655,7 +1700,29 @@ def home():
                     <p style="font-size: 1.1em; margin: 10px 0;"><strong>Reason:</strong> ${decision.reason}</p>
                     ${decision.recommendation ? `<p style="color: #d35400; background: #fdebd0; padding: 10px; border-radius: 5px;"><strong>💡 Recommendation:</strong> ${decision.recommendation}</p>` : ''}
                     <p style="font-size: 0.8em; color: #666; margin-top: 10px;">System: ${decision.system_type}</p>
+                    ${isTextOnly ? '<p style="background: #e8f5e9; padding: 10px; border-radius: 5px; margin-top: 10px;"><strong>⚡ Fast Mode:</strong> Text-only submission (image models skipped for efficiency)</p>' : ''}
                 </div>
+
+                ${isTextOnly ? `
+                <div class="result-card">
+                    <h3>📝 Text-Only Analysis</h3>
+                    <div class="metric">
+                        <span>Analysis Type</span>
+                        <span style="color: #27ae60; font-weight: bold;">⚡ Text Only (Fast)</span>
+                    </div>
+                    <div class="metric">
+                        <span>Text Category</span>
+                        <span>${data.analysis.text_abuse ? data.analysis.text_abuse.category : 'N/A'}</span>
+                    </div>
+                    <div class="metric">
+                        <span>Confidence</span>
+                        <span>${data.confidence && data.confidence.text_abuse ? (data.confidence.text_abuse * 100).toFixed(1) + '%' : 'N/A'}</span>
+                    </div>
+                    <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
+                        💡 <strong>Performance:</strong> Text-only submissions process 5x faster than image submissions (no GPU usage).
+                    </p>
+                </div>
+                ` : ''}
 
                 ${data.garbage_classification && data.garbage_classification.status !== 'unknown' ? `
                 <div class="result-card">
@@ -1663,7 +1730,7 @@ def home():
                     <div class="metric">
                         <span>Status</span>
                         <span style="font-weight: bold; color: ${data.garbage_classification.status === 'clean' ? '#27ae60' : '#e74c3c'};">
-                            ${data.garbage_classification.status === 'clean' ? '❌ NO GARBAGE' : '✅ GARBAGE DETECTED'}
+                            ${data.garbage_classification.status === 'clean' ? '✅ Clean: no garbage' : '✅ GARBAGE DETECTED'}
                         </span>
                     </div>
                     <div class="metric">
@@ -1676,6 +1743,7 @@ def home():
                 </div>
                 ` : ''}
 
+                ${!isTextOnly && data.privacy_protection ? `
                 <div class="result-card">
                     <h3>🛡️ Abuse & Safety Check</h3>
                     <h4 style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">👤 Human Detection (Privacy)</h4>
@@ -1691,24 +1759,26 @@ def home():
                     <h4 style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">🚫 Abusive Content Detection</h4>
                     <div class="metric">
                         <span>Abusive Content?</span>
-                        <span>${data.image_abuse_check.detected ? '❌ Detected' : '✅ Clean'}</span>
+                        <span>${data.image_abuse_check && data.image_abuse_check.detected ? '❌ Detected' : '✅ Clean'}</span>
                     </div>
                     <div class="metric">
                         <span>Flags</span>
-                        <span>${data.image_abuse_check.flags.length > 0 ? data.image_abuse_check.flags.join(', ') : 'None'}</span>
+                        <span>${data.image_abuse_check && data.image_abuse_check.flags && data.image_abuse_check.flags.length > 0 ? data.image_abuse_check.flags.join(', ') : 'None'}</span>
                     </div>
                     <div class="metric">
                         <span>Confidence</span>
-                        <span>${data.image_abuse_check.confidence ? (data.image_abuse_check.confidence * 100).toFixed(1) + '%' : '0%'}</span>
+                        <span>${data.image_abuse_check && data.image_abuse_check.confidence ? (data.image_abuse_check.confidence * 100).toFixed(1) + '%' : '0%'}</span>
                     </div>
                     <div style="margin-top: 10px; font-size: 0.9em; color: #555;">
                         <strong>Checks Performed:</strong>
                         <ul style="margin: 5px 0; padding-left: 20px;">
-                            ${data.image_abuse_check.checks_performed ? data.image_abuse_check.checks_performed.map(check => `<li>${check}</li>`).join('') : '<li>Standard checks</li>'}
+                            ${data.image_abuse_check && data.image_abuse_check.checks_performed ? data.image_abuse_check.checks_performed.map(check => `<li>${check}</li>`).join('') : '<li>Standard checks</li>'}
                         </ul>
                     </div>
                 </div>
+                ` : ''}
 
+            ${data.text_abuse_check && data.text_abuse_check.description_length > 0 ? `
             <div class="result-card">
                 <h3>📝 Text Analysis</h3>
                 <div class="metric">
@@ -1728,6 +1798,7 @@ def home():
                     <span>${data.text_abuse_check.description_length || 0} chars</span>
                 </div>
             </div>
+            ` : ''}
             `;
             resultDiv.innerHTML = html;
         }
@@ -1954,11 +2025,12 @@ def check_image_api():
                 strike_info = add_strike_to_user(user_id, violation_type, violation_reason)
                 result['strike_system'] = strike_info
             
-            # Update flutter response with strike info
-            result['flutter_response']['strike_info'] = strike_info
-            result['flutter_response']['title'] = strike_info['title']
-            result['flutter_response']['detailed_explanation'] = strike_info['detailed_warning']
-            result['flutter_response']['what_to_do_next'] = strike_info['what_happens_next']
+            # Update flutter response with strike info (if it exists)
+            if 'flutter_response' in result:
+                result['flutter_response']['strike_info'] = strike_info
+                result['flutter_response']['title'] = strike_info['title']
+                result['flutter_response']['detailed_explanation'] = strike_info['detailed_warning']
+                result['flutter_response']['what_to_do_next'] = strike_info['what_happens_next']
             
         elif should_issue_strike and is_web_test:
             # FOR WEB: Show strike notification but don't actually block

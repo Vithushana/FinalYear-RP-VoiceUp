@@ -460,26 +460,31 @@ def analyze_content(image_data, description):
     # This saves ~300ms processing time and avoids wasting GPU resources
     if not image_data and description and len(description.strip()) > 0:
         print("📝 TEXT-ONLY SUBMISSION DETECTED - Running text analysis only")
-        print(f"   Text length: {len(description)} characters")
         
         # Run only text abuse detection
         text_abuse_detected = False
         text_analysis = None
         text_abuse_category = None
-        text_abuse_confidence = 0.0
         
         try:
-            text_analysis = analyze_text_with_ai(description)
-            if text_analysis:
-                text_abuse_detected = text_analysis.get('is_abuse', False)
-                text_abuse_category = text_analysis.get('category', 'UNKNOWN')
-                text_abuse_confidence = text_analysis.get('confidence', 0.0)
-                
-                print(f"   Text Analysis Result: {text_abuse_category} (confidence: {text_abuse_confidence:.2%})")
+            # Returns (is_abusive, category, confidence)
+            is_abusive, category, confidence = analyze_text_with_ai(description)
+            text_abuse_detected = is_abusive
+            text_abuse_category = category if category else 'UNKNOWN'
+            
+            print(f"🤖 Text Analysis: {'ABUSE' if text_abuse_detected else 'SAFE'} (confidence: {confidence:.2f}%)")
+            
+            text_analysis = {
+                'is_abuse': is_abusive,
+                'category': category,
+                'confidence': confidence
+            }
+            
         except Exception as text_error:
             print(f"⚠️ Text analysis error: {text_error}")
             # If text analysis fails, allow submission (fail-open for text-only)
             text_analysis = {'is_abuse': False, 'category': 'ERROR', 'confidence': 0.0}
+            text_abuse_detected = False
         
         # Final decision for text-only submission
         if text_abuse_detected:
@@ -491,13 +496,15 @@ def analyze_content(image_data, description):
                     'strike_issued': True,
                     'system_type': 'TEXT ABUSE DETECTION'
                 },
-                'analysis': {
-                    'text_abuse': text_analysis,
-                    'submission_type': 'text_only'
+                'text_abuse_check': {
+                    'detected': text_abuse_detected,
+                    'flags': [text_abuse_category] if text_abuse_detected else [],
+                    'ai_powered': True,
+                    'ai_label': text_abuse_category,
+                    'ai_confidence': confidence,
+                    'description_length': len(description)
                 },
-                'confidence': {
-                    'text_abuse': text_abuse_confidence
-                }
+                'submission_type': 'text_only'
             }
         else:
             return {
@@ -508,13 +515,15 @@ def analyze_content(image_data, description):
                     'strike_issued': False,
                     'system_type': 'TEXT ANALYSIS'
                 },
-                'analysis': {
-                    'text_abuse': text_analysis,
-                    'submission_type': 'text_only'
+                'text_abuse_check': {
+                    'detected': text_abuse_detected,
+                    'flags': [],
+                    'ai_powered': True,
+                    'ai_label': text_abuse_category,
+                    'ai_confidence': confidence,
+                    'description_length': len(description)
                 },
-                'confidence': {
-                    'text_abuse': text_abuse_confidence
-                }
+                'submission_type': 'text_only'
             }
     
     # ================ IMAGE SUBMISSION PATH (ORIGINAL LOGIC) ================
@@ -1444,115 +1453,123 @@ def analyze_content(image_data, description):
     # EXTREMELY STRICT for Sri Lankan government issue reporting platform
     # Note: text_abuse_flags already initialized above
     
-    text_lower = description.lower()
-    
-    # === DISTILBERT FEATURE EXTRACTION LAYER ===
-    # These vocabulary patterns were extracted during model training (50K+ examples)
-    # Fast O(n) lookup for known patterns before full transformer inference
-    
-    # 1. ABUSIVE LANGUAGE DETECTION (FEATURE EXTRACTION LAYER)
-    profanity_words = [
-        # Core vocabulary features learned during model training - 100% explicit profanity
-        'fuck', 'fucking', 'fucked', 'shit', 'bitch', 'bastard',
-        'asshole', 'dickhead', 'motherfucker', 'whore', 'slut',
-        'cock', 'dick', 'pussy', 'cunt', 'penis', 'vagina',
-        'dumbass', 'jackass', 'retard', 'retarded', 'bullshit'
-    ]
-    # Run feature extraction (learned vocabulary lookup)
-    profanity_found = [word for word in profanity_words if word in text_lower]
-    if profanity_found:
-        text_abuse_flags.append(f"DistilBERT Feature Match: {', '.join(profanity_found)}")
-    
-    # 2. ETHNIC/COMMUNITY TARGETING (Contextual Feature Extraction)
-    ethnic_targeting = [
-        'tamil', 'sinhala', 'sinhalese', 'muslim', 'christian', 'buddhist', 
-        'hindu', 'burgher', 'malay', 'veddah', 'tamil tigers', 'jvp',
-        'ethnic', 'race', 'community', 'minority', 'majority'
-    ]
-    ethnic_found = [word for word in ethnic_targeting if word in text_lower]
-    if ethnic_found:
-        text_abuse_flags.append(f"Community targeting: {', '.join(ethnic_found)}")
-    
-    # 3. WEAPONS & DANGEROUS ITEMS (Threat Detection Features)
-    weapon_words = [
-        # Firearms
-        'gun', 'guns', 'pistol', 'rifle', 'shotgun', 'revolver', 'firearm',
-        'ak47', 'ak-47', 'ar15', 'ar-15', 'glock', 'beretta', 'colt',
-        'weapon', 'weapons', 'bullet', 'bullets', 'ammunition', 'ammo',
-        'trigger', 'barrel', 'magazine', 'clip', 'scope', 'silencer',
-        
-        # Explosives
-        'bomb', 'bombs', 'explosive', 'explosives', 'grenade', 'dynamite',
-        'c4', 'tnt', 'blast', 'detonate', 'explosion', 'landmine',
-        
-        # Bladed weapons
-        'knife', 'knives', 'blade', 'sword', 'dagger', 'machete',
-        'razor', 'cutting', 'stab', 'stabbing', 'slice', 'slicing'
-    ]
-    weapon_found = [word for word in weapon_words if word in text_lower]
-    if weapon_found:
-        text_abuse_flags.append(f"Weapon references: {', '.join(weapon_found)}")
-    
-    # 5. EXTREMISM DETECTION (Learned Threat Vocabulary)
-    terror_words = [
-        'ltte', 'tiger', 'prabhakaran', 'terrorist', 'terrorism', 'bomb', 
-        'attack', 'war', 'violence', 'militant', 'extremist', 'separatist',
-        'tamil eelam', 'suicide', 'killing', 'murder'
-    ]
-    terror_found = [word for word in terror_words if word in text_lower]
-    if terror_found:
-        text_abuse_flags.append(f"Extremist content: {', '.join(terror_found)}")
-    
-    # 6. VIOLENCE & THREAT CLASSIFICATION (Pattern Recognition)
-    threat_patterns = [
-        'kill you', 'i will kill', 'gonna kill', 'murder you',
-        'shoot you', 'stab you', 'bomb you', 'torture',
-        'i will hurt', 'gonna hurt', 'destroy you'
-    ]
-    threat_found = [word for word in threat_patterns if word in text_lower]
-    if threat_found:
-        text_abuse_flags.append(f"Threatening language: {', '.join(threat_found)}")
-    
-    # 7. HATE SPEECH DETECTION (Discrimination Feature Extraction)
-    hate_speech = [
-        'nigger', 'nigga', 'faggot', 'kike', 'chink', 'gook',
-        'wetback', 'raghead', 'towelhead', 'spic'
-    ]
-    hate_found = [word for word in hate_speech if word in text_lower]
-    if hate_found:
-        text_abuse_flags.append(f"Hate speech: {', '.join(hate_found)}")
-    
-    # 8. ADVANCED PATTERN RECOGNITION (Contextual Features)
-    # === DISTILBERT DEEP CONTEXTUAL ANALYSIS (Transformer Layer) ===
-    # After feature extraction, run full transformer inference for contextual understanding
-    # Catches implicit abuse, sarcasm, coded language that pattern matching misses
-    # Model: DistilBERT-base fine-tuned on 50K abuse examples
-    ai_text_confidence = 0.0
-    ai_text_label = "SAFE"
-    
-    # OPTIMIZATION: Only run text analysis if user provided text (saves API calls)
-    if description and len(description.strip()) > 0:
-        print("📝 Running text abuse analysis...")
-        if DISTILBERT_AVAILABLE and distilbert_pipeline is not None:
-            try:
-                is_abusive_ai, label_ai, confidence_ai = analyze_text_with_ai(description)
-                ai_text_confidence = confidence_ai
-                ai_text_label = label_ai
-                
-                if is_abusive_ai:
-                    text_abuse_flags.append(f"Text Analysis: {label_ai} ({confidence_ai:.1%})")
-                    print(f"🚨 Text Abuse Alert: {label_ai} ({confidence_ai:.2f})")
-                else:
-                    print(f"✅ Text Check: Safe ({confidence_ai:.2f})")
-            except Exception as e:
-                print(f"⚠️ ML Text Analysis Failed: {e}")
-        else:
-            print("⚪ ML text analysis not available")
+    # Skip text analysis for image-only submissions (no description provided)
+    if not description or len(description.strip()) == 0:
+        print("📸 IMAGE-ONLY SUBMISSION - Skipping text analysis")
+        has_text_abuse = False
+        text_abuse_flags = []
+        text_abuse_category = None
+        text_abuse_confidence = 0.0
+        ai_text_confidence = 0.0
+        ai_text_label = 'SAFE'
     else:
-        print("⏭️ No text provided - skipping text abuse analysis (API optimization)")
-    
-    # FINAL TEXT ASSESSMENT - ANY flag means rejection for government platform
-    has_text_abuse = len(text_abuse_flags) > 0
+        text_lower = description.lower()
+        
+        # === DISTILBERT FEATURE EXTRACTION LAYER ===
+        # These vocabulary patterns were extracted during model training (50K+ examples)
+        # Fast O(n) lookup for known patterns before full transformer inference
+        
+        # 1. ABUSIVE LANGUAGE DETECTION (FEATURE EXTRACTION LAYER)
+        profanity_words = [
+            # Core vocabulary features learned during model training - 100% explicit profanity
+            'fuck', 'fucking', 'fucked', 'shit', 'bitch', 'bastard',
+            'asshole', 'dickhead', 'motherfucker', 'whore', 'slut',
+            'cock', 'dick', 'pussy', 'cunt', 'penis', 'vagina',
+            'dumbass', 'jackass', 'retard', 'retarded', 'bullshit'
+        ]
+        # Run feature extraction (learned vocabulary lookup)
+        profanity_found = [word for word in profanity_words if word in text_lower]
+        if profanity_found:
+            text_abuse_flags.append(f"DistilBERT Feature Match: {', '.join(profanity_found)}")
+        
+        # 2. ETHNIC/COMMUNITY TARGETING (Contextual Feature Extraction)
+        ethnic_targeting = [
+            'tamil', 'sinhala', 'sinhalese', 'muslim', 'christian', 'buddhist', 
+            'hindu', 'burgher', 'malay', 'veddah', 'tamil tigers', 'jvp',
+            'ethnic', 'race', 'community', 'minority', 'majority'
+        ]
+        ethnic_found = [word for word in ethnic_targeting if word in text_lower]
+        if ethnic_found:
+            text_abuse_flags.append(f"Community targeting: {', '.join(ethnic_found)}")
+        
+        # 3. WEAPONS & DANGEROUS ITEMS (Threat Detection Features)
+        weapon_words = [
+            # Firearms
+            'gun', 'guns', 'pistol', 'rifle', 'shotgun', 'revolver', 'firearm',
+            'ak47', 'ak-47', 'ar15', 'ar-15', 'glock', 'beretta', 'colt',
+            'weapon', 'weapons', 'bullet', 'bullets', 'ammunition', 'ammo',
+            'trigger', 'barrel', 'magazine', 'clip', 'scope', 'silencer',
+            
+            # Explosives
+            'bomb', 'bombs', 'explosive', 'explosives', 'grenade', 'dynamite',
+            'c4', 'tnt', 'blast', 'detonate', 'explosion', 'landmine',
+            
+            # Bladed weapons
+            'knife', 'knives', 'blade', 'sword', 'dagger', 'machete',
+            'razor', 'cutting', 'stab', 'stabbing', 'slice', 'slicing'
+        ]
+        weapon_found = [word for word in weapon_words if word in text_lower]
+        if weapon_found:
+            text_abuse_flags.append(f"Weapon references: {', '.join(weapon_found)}")
+        
+        # 5. EXTREMISM DETECTION (Learned Threat Vocabulary)
+        terror_words = [
+            'ltte', 'tiger', 'prabhakaran', 'terrorist', 'terrorism', 'bomb', 
+            'attack', 'war', 'violence', 'militant', 'extremist', 'separatist',
+            'tamil eelam', 'suicide', 'killing', 'murder'
+        ]
+        terror_found = [word for word in terror_words if word in text_lower]
+        if terror_found:
+            text_abuse_flags.append(f"Extremist content: {', '.join(terror_found)}")
+        
+        # 6. VIOLENCE & THREAT CLASSIFICATION (Pattern Recognition)
+        threat_patterns = [
+            'kill you', 'i will kill', 'gonna kill', 'murder you',
+            'shoot you', 'stab you', 'bomb you', 'torture',
+            'i will hurt', 'gonna hurt', 'destroy you'
+        ]
+        threat_found = [word for word in threat_patterns if word in text_lower]
+        if threat_found:
+            text_abuse_flags.append(f"Threatening language: {', '.join(threat_found)}")
+        
+        # 7. HATE SPEECH DETECTION (Discrimination Feature Extraction)
+        hate_speech = [
+            'nigger', 'nigga', 'faggot', 'kike', 'chink', 'gook',
+            'wetback', 'raghead', 'towelhead', 'spic'
+        ]
+        hate_found = [word for word in hate_speech if word in text_lower]
+        if hate_found:
+            text_abuse_flags.append(f"Hate speech: {', '.join(hate_found)}")
+        
+        # 8. ADVANCED PATTERN RECOGNITION (Contextual Features)
+        # === DISTILBERT DEEP CONTEXTUAL ANALYSIS (Transformer Layer) ===
+        # After feature extraction, run full transformer inference for contextual understanding
+        # Catches implicit abuse, sarcasm, coded language that pattern matching misses
+        # Model: DistilBERT-base fine-tuned on 50K abuse examples
+        ai_text_confidence = 0.0
+        ai_text_label = "SAFE"
+        
+        # OPTIMIZATION: Only run text analysis if user provided text (saves API calls)
+        if description and len(description.strip()) > 0:
+            print("📝 Running text abuse analysis...")
+            if DISTILBERT_AVAILABLE and distilbert_pipeline is not None:
+                try:
+                    is_abusive_ai, label_ai, confidence_ai = analyze_text_with_ai(description)
+                    ai_text_confidence = confidence_ai
+                    ai_text_label = label_ai
+                    
+                    if is_abusive_ai:
+                        text_abuse_flags.append(f"Text Analysis: {label_ai} ({confidence_ai:.1%})")
+                        print(f"🚨 Text Abuse Alert: {label_ai} ({confidence_ai:.2f})")
+                    else:
+                        print(f"✅ Text Check: Safe ({confidence_ai:.2f})")
+                except Exception as e:
+                    print(f"⚠️ ML Text Analysis Failed: {e}")
+            else:
+                print("⚪ ML text analysis not available")
+        
+        # FINAL TEXT ASSESSMENT - ANY flag means rejection for government platform
+        has_text_abuse = len(text_abuse_flags) > 0
     
     # ================ PHASE 4: GARBAGE CLASSIFICATION (FOR ALL IMAGES) ================
     # This classifies ANY image as containing garbage or being clean
@@ -1876,10 +1893,10 @@ def home():
         
         <div class="upload-section">
             <input type="file" id="imageInput" accept="image/*" style="display: none;">
-            <button onclick="document.getElementById('imageInput').click()" style="background-color: #3498db; width: auto; margin-bottom: 10px;">📸 Select Road Image (Optional)</button>
+            <button onclick="document.getElementById('imageInput').click()" style="background-color: #3498db; width: auto; margin-bottom: 10px;">📸 Select Road Image</button>
             <p id="fileName">No file selected</p>
             <img id="imagePreview" class="preview-image">
-            <p style="color: #7f8c8d; font-size: 0.9em; margin-top: 10px;">💡 You can submit text-only reports without an image</p>
+            <p style="color: #7f8c8d; font-size: 0.9em; margin-top: 10px;">💡 For best results, provide both image and description for clarity</p>
         </div>
 
         <div class="form-group">
@@ -2048,7 +2065,9 @@ def home():
                         💡 <strong>Performance:</strong> Text-only submissions process 5x faster than image submissions (no GPU usage).
                     </p>
                 </div>
-                ` : `
+                ` : ''}
+
+                ${!isTextOnly && data.image_relevance_check ? `
                 <div class="result-card">
                     <h3>🛣️ Road Relevancy Check</h3>
                     <div class="metric">
@@ -2095,7 +2114,9 @@ def home():
                     </p>
                     ` : ''}
                 </div>
+                ` : ''}
 
+                ${!isTextOnly && data.privacy_protection ? `
                 <div class="result-card">
                     <h3>🛡️ Abuse & Safety Check</h3>
                     <h4 style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">👤 Human Detection (Privacy)</h4>
@@ -2128,7 +2149,9 @@ def home():
                         </ul>
                     </div>
                 </div>
+                ` : ''}
 
+            ${data.text_abuse_check && data.text_abuse_check.description_length > 0 ? `
             <div class="result-card">
                 <h3>📝 Text Analysis</h3>
                 <div class="metric">
@@ -2148,7 +2171,7 @@ def home():
                     <span>${data.text_abuse_check.description_length || 0} chars</span>
                 </div>
             </div>
-            `}
+            ` : ''}
             `;
             resultDiv.innerHTML = html;
         }
