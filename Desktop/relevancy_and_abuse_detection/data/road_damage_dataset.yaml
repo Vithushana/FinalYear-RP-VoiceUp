@@ -1,0 +1,19 @@
+# Road Damage Dataset Configuration
+# Generated on 2025-11-23 11:51:40
+
+path: c:\Users\Admin pc\Desktop\relevancy_and_abuse_detection\data\consolidated_road_dataset  # dataset root dir
+train: train  # train images (relative to 'path')
+val: valid    # val images (relative to 'path') 
+test: test    # test images (relative to 'path')
+
+# Classes
+nc: 6  # number of classes
+names: ['alligator_cracking', 'lateral_cracking', 'longitudinal_cracking', 'potholes', 'pothole_water', 'combination_damage']  # class names
+
+# Dataset info
+total_images: 3813
+train_images: 2668  
+val_images: 764
+test_images: 381
+
+# Damage type distribution based on original folder structure
