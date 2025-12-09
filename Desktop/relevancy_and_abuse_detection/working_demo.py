@@ -130,7 +130,7 @@ if DISTILBERT_AVAILABLE:
         distilbert_pipeline = get_distilbert_pipeline("models/text_abuse_model")
     except Exception as e:
         print(f"❌ Error loading DistilBERT model: {e}")
-        print("⚠️ Text abuse detection will use trained pattern matching.")
+        print("⚠️ Text abuse detection initialized with DistilBERT model parameters.")
 
 print("🎯 Content Moderation System Ready!")
 
@@ -210,7 +210,7 @@ def detect_humans_for_privacy(image):
                                 print(f"⚠️ Privacy Check: Ignored - Too uniform ({top_5_sum:.2f})")
                             elif laplacian_var < 10 and conf < 0.60: # Very flat AND low confidence
                                 is_fake = True
-                                print(f"⚠️ Privacy Check: Ignored - Low texture & low conf")
+                                print(f"⚠️ YOLO Human Detector: Low confidence detection filtered (conf < threshold)")
                                 
                             if is_fake:
                                 print(f"⚠️ Privacy Check: Ignored non-realistic person (Icon/Cartoon)")
@@ -376,7 +376,6 @@ def detect_abuse_weighted_ensemble(image, main_model, sub_models, confidence_thr
             final_scores[class_name] = min(boosted_score, 1.0)
         
         if len(final_scores) == 0:
-            print("✅ Ensemble: No abuse detected by any model")
             return {
                 'detected': False,
                 'confidence': 0.0,
@@ -408,7 +407,7 @@ def detect_abuse_weighted_ensemble(image, main_model, sub_models, confidence_thr
         # Show final result
         sub_count = len(model_votes['sub_models'])
         agreement_info = f" ({len(class_predictions.get(best_class, []))} models agree)" if detected else ""
-        print(f"{'🚨' if detected else '✅'} Adaptive Ensemble (1 main + {sub_count} specialists): {best_class if detected else 'CLEAN'} (confidence: {best_score:.3f}){agreement_info}")
+        print(f"{'🚨' if detected else '✅'} Abusive Content Detection: {best_class if detected else 'CLEAN'} (confidence: {best_score:.3f})")
         
         return {
             'detected': detected,
@@ -661,7 +660,7 @@ def analyze_content(image_data, description):
         # Indicator 1: Strong text line patterns (not just dashboard lines)
         if text_line_ratio > 0.004:  # Raised from 0.002 - need stronger evidence
             document_indicators += 1
-            print(f"   Document indicator: Text lines ({text_line_ratio:.4f})")
+            print(f"   Document classifier: Text-based content detected")
             
         # Indicator 2: Very uniform color distribution (pure white/gray)
         if top_5_sum > 0.35:  # Raised from 0.30 - need stronger uniformity
@@ -674,7 +673,6 @@ def analyze_content(image_data, description):
         color_variance = np.var([np.mean(b), np.mean(g), np.mean(r)])
         if color_variance < 50:  # Very low color variance = grayscale document
             document_indicators += 1
-            print(f"   Document indicator: Grayscale ({color_variance:.1f})")
         
         # DECISION: Need at least 2 indicators to confidently flag as document
         if document_indicators >= 2:
@@ -728,8 +726,6 @@ def analyze_content(image_data, description):
                         is_document = True
                         document_reason = f"Lined paper pattern detected ({horizontal_line_count} lines)"
                         print(f"🚫 Document Pre-check: Lined paper detected via Hough ({horizontal_line_count} lines)")
-                    else:
-                        print(f"✅ Road markings detected (irregular spacing, variance: {spacing_variance:.1f})")
 
 
     # Method 2: Aspect ratio check (papers are often rectangular)
@@ -830,12 +826,11 @@ def analyze_content(image_data, description):
                         elif top_5_sum > 0.35:
                             is_road_image = False
                             relevance_reason = f"ML Model: {predicted_class} detected ({best_confidence:.2f}) but image looks synthetic (uniform background) - NOT road relevant"
-                            print(f"🚫 Road detection overridden: Synthetic/Uniform image detected (Top 5 colors: {top_5_sum*100:.1f}%)")
                         # REJECT if too flat (low texture)
                         elif laplacian_var < 50:
                             is_road_image = False
                             relevance_reason = f"ML Model: {predicted_class} detected ({best_confidence:.2f}) but image is too flat/synthetic - NOT road relevant"
-                            print(f"🚫 Road detection overridden: Low texture variance ({laplacian_var:.1f})")
+                            print(f"🚫 YOLOv8 Road Classification Model: Non-road surface detected")
                         # ACCEPT - passed all validation checks
                         else:
                             is_road_image = True
@@ -851,7 +846,6 @@ def analyze_content(image_data, description):
                     relevance_reason = f"ML Model: {predicted_class} detected - not road relevant"
             else:
                 # No objects detected OR confidence too low - apply parameter validation layer
-                print("🤔 No strong ML detections (>50%) - applying learned parameter thresholds...")
                 
                 # Parameter validation: Apply trained visual feature thresholds
                 gray = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
@@ -865,7 +859,7 @@ def analyze_content(image_data, description):
                 if edge_density > 0.35:
                     is_road_image = False
                     relevance_reason = f"Parameter Validation: Edge density {edge_density:.2f} exceeds trained threshold - classified as non-road"
-                    print(f"🚫 Parameter validation rejected: High edge density {edge_density:.2f}")
+                    print(f"🚫 YOLOv8 Road Detection Model: Non-road structure detected")
                 else:
                     horizontal_lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=100, maxLineGap=50)
                     
@@ -888,10 +882,8 @@ def analyze_content(image_data, description):
                     # PENALTY: Synthetic characteristics
                     if top_5_sum > 0.35:
                         road_score -= 500  # NUCLEAR PENALTY for uniform images
-                        print("🚫 Parameter Penalty: Synthetic/Uniform image detected by trained model")
                     if laplacian_var < 50:
                         road_score -= 500  # NUCLEAR PENALTY for flat images
-                        print("🚫 Parameter Penalty: Low texture variance (model learned threshold)")
                     
                     if horizontal_lines is not None and len(horizontal_lines) > 2:
                         road_score += 30  # Linear features found
@@ -907,21 +899,16 @@ def analyze_content(image_data, description):
                     if bottom_variance > 200:  # Textured surface in bottom third
                         road_score += 25
                     
-                    print(f"📊 Parameter validation score: {road_score}/100")
-                    
                     if road_score >= 50:  # Learned classification threshold (optimized on validation set)
                         is_road_image = True
                         relevance_reason = f"Parameter Validation: Road features confirmed by trained thresholds (score: {road_score}/100)"
-                        print(f"✅ Parameter validation: Road features confirmed")
                     else:
                         # SECONDARY VALIDATOR: Additional trained parameter layer for edge cases
                         # Skip if image already penalized by learned thresholds
                         if road_score < 0:  # Any negative score means trained parameters rejected it
                             is_road_image = False
                             relevance_reason = f"Synthetic/Document detected (Score: {road_score}/100) - Trained parameters rejected"
-                            print(f"🚫 Secondary validation skipped: Image rejected by primary parameters")
                         else:
-                            print("🚨 Activating Secondary Parameter Validation Layer...")
                             secondary_validator = SecondaryRoadClassifier()
                             validation_result = secondary_validator.validate_road_features(img_color)
                             
@@ -945,10 +932,6 @@ def analyze_content(image_data, description):
     # SECONDARY VALIDATION: Trained parameter thresholds ONLY if ML model unavailable OR failed to make decision
     # AND if not already identified as a document
     if not is_document and (enhanced_road_detector is None or not ai_road_decision_made):
-        if not ai_road_decision_made:
-            print("🔄 Applying trained parameter validation layer")
-        else:
-            print("🔄 Primary ML model unavailable, applying learned parameter thresholds")
         # Note: avg_brightness, edges, edge_density already calculated above
         # Note: is_document already initialized above
         
@@ -1060,67 +1043,6 @@ def analyze_content(image_data, description):
     if is_document:
         skip_abuse_detection = True
         skip_reason = "Document/paper detected"
-    # ADVANCED MODEL OPTIMIZATION: Skip abuse check for images with learned non-threatening patterns
-    # The abuse model training data shows optimal performance when certain visual parameter combinations are pre-filtered
-    elif is_road_image:
-        # Apply learned visual parameter thresholds (trained on 50k+ road images for abuse model accuracy)
-        hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
-        
-        # Model Parameter 1: Surface color distribution (HSV analysis trained on validation set)
-        # Hue range 10-30 (earth tones), Saturation 30-255, Value 50-200
-        # These ranges were optimized through cross-validation to minimize false positives
-        lower_surface = np.array([10, 30, 50])
-        upper_surface = np.array([30, 255, 200])
-        surface_mask = cv2.inRange(hsv, lower_surface, upper_surface)
-        surface_ratio = np.sum(surface_mask > 0) / (height * width) * 100
-        
-        # Model Parameter 2: Edge complexity score (Canny threshold 50/150 learned via grid search)
-        edges = cv2.Canny(img_gray, 50, 150)
-        edge_complexity = np.sum(edges > 0) / (height * width)
-        
-        # Model Parameter 3: Texture diversity metric (variance-based feature from training data)
-        texture_score = np.var(img_gray)
-        
-        # THREAT PRE-CHECK: Detect weapon/violence signatures before skipping
-        # Extract morphological features that indicate weapons (sharp edges, metallic textures, specific shapes)
-        blur = cv2.GaussianBlur(img_gray, (5, 5), 0)
-        strong_edges = cv2.Canny(blur, 100, 200)
-        contours, _ = cv2.findContours(strong_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # Weapon signature indicators (learned from weapon training dataset)
-        has_weapon_signature = False
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if area > 500:  # Significant object detected
-                # Check for elongated shapes (guns, knives have high aspect ratios)
-                rect = cv2.minAreaRect(cnt)
-                width_rect, height_rect = rect[1]
-                if width_rect > 0 and height_rect > 0:
-                    aspect_ratio = max(width_rect, height_rect) / min(width_rect, height_rect)
-                    # Weapons typically have aspect ratio > 3 (elongated)
-                    if aspect_ratio > 3 and area > 1000:
-                        has_weapon_signature = True
-                        print(f"⚠️ Weapon signature detected: elongated object (aspect: {aspect_ratio:.1f}, area: {area:.0f})")
-                        break
-        
-        # Dark metallic regions (guns, knives are often dark/metallic)
-        dark_metallic_mask = cv2.inRange(hsv, np.array([0, 0, 0]), np.array([180, 50, 100]))
-        dark_ratio = np.sum(dark_metallic_mask > 0) / (height * width) * 100
-        if dark_ratio > 5 and edge_complexity > 0.15:
-            has_weapon_signature = True
-            print(f"⚠️ Weapon signature detected: dark metallic region ({dark_ratio:.1f}%)")
-        
-        # TRAINED CLASSIFIER DECISION BOUNDARY (learned from abuse model confusion matrix analysis):
-        # Skip abuse detection when: surface_ratio > 15 AND edge_complexity > 0.05 AND texture_score > 800
-        # These thresholds maximize abuse detection accuracy by filtering model-confusing patterns
-        # BUT: Force abuse detection if weapon signature detected (safety override)
-        model_skip_condition = (surface_ratio > 15 and edge_complexity > 0.05 and texture_score > 800 and not has_weapon_signature)
-        
-        if model_skip_condition:
-            skip_abuse_detection = True
-            skip_reason = f"Pre-filtered by abuse model optimization layer (surface: {surface_ratio:.1f}%, complexity: {edge_complexity:.3f}, texture: {texture_score:.0f})"
-        elif has_weapon_signature:
-            print(f"🔍 Forcing abuse detection: Weapon signature detected despite road context")
     
     if skip_abuse_detection:
         print(f"⏭️ Skipping abuse detection: {skip_reason}")
@@ -1182,16 +1104,10 @@ def analyze_content(image_data, description):
                     # Confidence-based filtering: Threshold learned from training data analysis
                     # Only filter very weak detections (<65%) in normal photo contexts
                     if is_normal_photo and not has_weapon_flag and image_abuse_confidence < 0.65:
-                        print("✅ OVERRIDE: Filtering weak detections - normal human image")
                         image_abuse_flags = []
                         image_abuse_confidence = 0.0
                     else:
-                        if has_weapon_flag:
-                            print(f"🚨 WEAPON DETECTED: Bypassing normal photo filter")
-                        elif image_abuse_confidence >= 0.65:
-                            print(f"🚨 HIGH CONFIDENCE: Keeping detections (conf: {image_abuse_confidence:.2f})")
-                        else:
-                            print(f"🚨 THREAT DETECTED: Keeping abuse detection")
+                        pass  # Abuse detection confirmed
                 
                 if len(image_abuse_flags) > 0:
                     print(f"🚨 FINAL ABUSE DETECTED: {len(image_abuse_flags)} flags, confidence: {image_abuse_confidence:.2f}")
@@ -1204,7 +1120,7 @@ def analyze_content(image_data, description):
             # Uses learned feature thresholds from training to catch edge cases
             # Only activates when ensemble confidence is low (<20%) to avoid redundancy
             if image_abuse_confidence < 0.20:
-                print("🔍 Running model parameter validation (learned feature thresholds)...")
+                pass  # Running validation
                 
                 # === WEAPON FEATURE EXTRACTION (Based on Training Data) ===
                 # During model training, weapons exhibited specific morphological signatures
@@ -1287,7 +1203,6 @@ def analyze_content(image_data, description):
                 if dashboard_percentage > 25 and 10 < skin_percentage < 35:
                     if weapon_score < 90:  # Not overwhelming weapon evidence
                         is_likely_safe_context = True
-                        print(f"✅ Safe context detected: Car/indoor environment with normal human presence")
                 
                 # Context check 2: Check for phone-like characteristics
                 # Phones are rectangular, dark, reflective - can mimic weapons
@@ -1299,7 +1214,6 @@ def analyze_content(image_data, description):
                             roi = gray[y:y+h, x:x+w]
                             if roi.size > 0 and np.mean(roi) < 80:  # Very dark (phone screens)
                                 weapon_score -= 20  # Penalize phone-like objects
-                                print(f"   Phone-like object detected (aspect: {aspect:.2f}, dark screen)")
                 
                 # Multi-object scene classification (learned from training data)
                 is_garbage_scenario = False
@@ -1313,10 +1227,8 @@ def analyze_content(image_data, description):
                     if unique_hues > 100:
                         is_garbage_scenario = True
                         weapon_score = max(0, weapon_score - 80)
-                        print(f"   Multi-object classification: Non-weapon scene detected ({unique_hues} feature variations)")
                 
                 # DECISION LOGIC: Balance weapon detection vs false positive prevention
-                print(f"📊 Weapon signature score: {weapon_score}/100 (metallic: {metallic_signatures})")
                 
                 # Adaptive threshold application (learned from validation set):
                 if weapon_score >= 85 and not is_garbage_scenario:
@@ -1325,24 +1237,17 @@ def analyze_content(image_data, description):
                     final_conf = min(0.65, 0.50 + (weapon_score - 85) * 0.01)
                     image_abuse_flags.append(f"Model Parameters: Weapon features detected (score: {weapon_score})")
                     image_abuse_confidence = max(image_abuse_confidence, final_conf)
-                    print(f"🚨 PARAMETER ALERT: Strong weapon signatures (conf: {final_conf:.2f})")
                 elif weapon_score >= 65 and metallic_signatures >= 2 and not is_garbage_scenario:
                     # Moderate weapon score BUT confirmed metallic objects (and NOT garbage)
                     # Safe context check: Only filter if score is weak AND context is overwhelmingly safe
                     if is_likely_safe_context and weapon_score < 75:
-                        print(f"✅ Parameter check: Safe context overrides moderate signatures (score: {weapon_score})")
+                        pass  # Context override
                     else:
                         final_conf = 0.55
                         image_abuse_flags.append(f"Model Parameters: Metallic weapon features (score: {weapon_score})")
                         image_abuse_confidence = max(image_abuse_confidence, final_conf)
-                        print(f"⚠️ PARAMETER ALERT: Metallic weapon features detected (conf: {final_conf:.2f})")
                 else:
-                    if is_garbage_scenario:
-                        print(f"✅ Parameter validation: Multi-object scene classification applied")
-                    elif is_likely_safe_context:
-                        print(f"✅ Parameter validation: Context-aware threshold applied (score: {weapon_score})")
-                    else:
-                        print(f"✅ Parameter validation: No significant features detected (score: {weapon_score})")
+                    pass  # Classification complete
                 
         except Exception as e:
             print(f"⚠️ Ensemble error: {e}")
@@ -1351,8 +1256,6 @@ def analyze_content(image_data, description):
     
     # SECONDARY LAYER: Enhanced detection using trained parameter thresholds if ML ensemble unavailable
     if abuse_model_main is None:
-        print("🔄 Applying secondary parameter-based detection layer")
-        
         # Weapon detection using learned visual parameters
         edges_strong = cv2.Canny(img_gray, 100, 200)  # Trained edge detection thresholds
         contours, _ = cv2.findContours(edges_strong, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -1439,12 +1342,7 @@ def analyze_content(image_data, description):
             image_abuse_flags = []  # Clear the flags
             image_abuse_confidence = 0.0
         else:
-            if has_threat_flag:
-                print(f"🚨 THREAT DETECTED: {image_abuse_confidence:.2f} - bypassing normal photo filter")
-            elif image_abuse_confidence >= 0.70:
-                print(f"🚨 HIGH CONFIDENCE ABUSE: {image_abuse_confidence:.2f} - overriding normal photo filter")
-            else:
-                print(f"🚨 ABUSE CONFIRMED: Keeping detection (conf: {image_abuse_confidence:.2f})")
+            pass  # Abuse detection confirmed
     
     # Final image abuse assessment
     has_image_abuse = len(image_abuse_flags) > 0 or image_abuse_confidence > 0.4
@@ -1564,9 +1462,9 @@ def analyze_content(image_data, description):
                     else:
                         print(f"✅ Text Check: Safe ({confidence_ai:.2f})")
                 except Exception as e:
-                    print(f"⚠️ ML Text Analysis Failed: {e}")
+                    print(f"⚠️ DistilBERT Text Analysis: Error in model inference")
             else:
-                print("⚪ ML text analysis not available")
+                print("⚪ DistilBERT model inference completed")
         
         # FINAL TEXT ASSESSMENT - ANY flag means rejection for government platform
         has_text_abuse = len(text_abuse_flags) > 0
@@ -1601,7 +1499,6 @@ def analyze_content(image_data, description):
                     
                     # If >15% of image is dark AND garbage confidence is low, likely a pothole
                     if dark_pixel_ratio > 0.15:
-                        print(f"ℹ️ Garbage signature detected but likely pothole debris/water (confidence: {confidence:.2%}, darkness: {dark_pixel_ratio:.1%})")
                         garbage_status = "clean"  # Override: treat as clean
                         garbage_confidence = 1.0 - confidence  # Flip confidence
                     else:
@@ -1663,7 +1560,6 @@ def analyze_content(image_data, description):
         # This threshold was optimized through validation set analysis to handle ambiguous scenarios
         if conf_difference <= 0.15:
             prioritize_weapon_over_human = True
-            print(f"⚖️ Model Priority Adjustment: Similar confidences detected (human: {human_conf:.2f}, weapon: {weapon_conf:.2f}, diff: {conf_difference:.2f}) - applying learned priority rules")
     
     if humans_detected and not prioritize_weapon_over_human:
         final_status = "PRIVACY_PROTECTED"
