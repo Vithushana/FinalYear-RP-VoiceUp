@@ -68,3 +68,10 @@ temp/
 runs/
 results/
 wandb/
+CODE_EXPLANATION_PART1_setup.md  
+CODE_EXPLANATION_PART2_ensemble.md  
+CODE_EXPLANATION_PART3_analysis.md  
+CODE_EXPLANATION_PART4_strikes.md  
+COMPLETE_MODEL_METRICS.md  
+PANEL_EXPLANATION_emergency_road_detector.md  
+PANEL_EXPLANATION_enhanced_road_detection.md 
