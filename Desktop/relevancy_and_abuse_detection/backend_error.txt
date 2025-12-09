@@ -1,8 +1,0 @@
-Error: cannot access local variable 'ai_text_confidence' where it is not associated with a value
-Traceback (most recent call last):
-  File "C:\Users\Admin pc\Desktop\relevancy_and_abuse_detection\working_demo.py", line 2338, in check_image_api
-    result = analyze_content(image_data, description)
-  File "C:\Users\Admin pc\Desktop\relevancy_and_abuse_detection\working_demo.py", line 1791, in analyze_content
-    'ai_confidence': round(ai_text_confidence, 2),  # Always show actual confidence
-                           ^^^^^^^^^^^^^^^^^^
-UnboundLocalError: cannot access local variable 'ai_text_confidence' where it is not associated with a value
