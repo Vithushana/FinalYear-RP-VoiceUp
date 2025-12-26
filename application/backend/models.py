@@ -29,6 +29,11 @@ class User(db.Model):
     posts = db.relationship('Post', foreign_keys='Post.user_id', backref='author', lazy=True, cascade='all, delete-orphan')
     notifications = db.relationship('Notification', backref='user', lazy=True, cascade='all, delete-orphan')
     
+    # Composite index for officer queries
+    __table_args__ = (
+        db.Index('idx_officer_location_type', 'is_officer', 'officer_province', 'officer_district', 'officer_region', 'officer_type'),
+    )
+    
     def to_dict(self):
         return {
             'id': self.id,
@@ -41,6 +46,8 @@ class User(db.Model):
             'is_officer': self.is_officer,
             'officer_province': self.officer_province,
             'officer_district': self.officer_district,
+            'officer_region': self.officer_region,
+            'officer_type': self.officer_type,
             'officer_title': self.officer_title,
             'display_name': self.display_name,
             'avatar_type': self.avatar_type,
@@ -84,6 +91,12 @@ class Post(db.Model):
     shares = db.relationship('Share', backref='post', lazy=True, cascade='all, delete-orphan')
     assigned_officer = db.relationship('User', foreign_keys=[assigned_officer_id], backref=db.backref('assigned_posts', lazy=True), lazy=True, overlaps="posts,author")
     
+    # Composite indexes for performance
+    __table_args__ = (
+        db.Index('idx_post_location_type', 'province', 'district', 'region', 'issue_type'),
+        db.Index('idx_post_status_created', 'status', 'created_at'),
+    )
+    
     def get_images(self):
         if self.images:
             return json.loads(self.images)
@@ -119,6 +132,7 @@ class Post(db.Model):
             'district': self.district,
             'region': self.region,
             'issue_type': self.issue_type,
+            'road_type': self.road_type,
             'images': self.get_images(),
             'status': self.status,
             'assigned_officer_id': self.assigned_officer_id,

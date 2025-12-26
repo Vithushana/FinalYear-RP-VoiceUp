@@ -3,11 +3,23 @@ from models import db, User
 from utils import hash_password, verify_password, generate_token, format_error_response, format_success_response
 from otp_service import send_otp_to_phone, verify_otp, otp_storage
 import traceback
+from datetime import datetime, timedelta
 
 auth_bp = Blueprint('auth_otp', __name__, url_prefix='/api/auth')
 
 # Temporary storage for pending signups (in production, use Redis or database)
+# Format: {phone: {'data': signup_data, 'expires_at': datetime}}
 pending_signups = {}
+
+def cleanup_expired_signups():
+    """Remove expired pending signups to prevent memory leak"""
+    now = datetime.utcnow()
+    expired_phones = [phone for phone, data in pending_signups.items() 
+                      if data.get('expires_at') and data['expires_at'] < now]
+    for phone in expired_phones:
+        del pending_signups[phone]
+    if expired_phones:
+        print(f"🧹 Cleaned up {len(expired_phones)} expired pending signups")
 
 @auth_bp.route('/send-otp', methods=['POST'])
 def send_otp():
@@ -48,8 +60,14 @@ def send_otp():
         if User.query.filter_by(email=signup_data['email']).first():
             return format_error_response('Email already exists')
         
-        # Store pending signup
-        pending_signups[phone] = signup_data
+        # Cleanup expired signups before adding new one
+        cleanup_expired_signups()
+        
+        # Store pending signup with 15-minute expiration
+        pending_signups[phone] = {
+            'data': signup_data,
+            'expires_at': datetime.utcnow() + timedelta(minutes=15)
+        }
         
         # Send OTP
         print(f"🔄 Sending OTP to: {phone}")
@@ -95,9 +113,16 @@ def verify_otp_endpoint():
         
         if success:
             # Get pending signup data
-            signup_data = pending_signups.get(phone)
-            if not signup_data:
+            signup_entry = pending_signups.get(phone)
+            if not signup_entry:
                 return format_error_response('Signup session expired')
+            
+            # Check if expired
+            if signup_entry.get('expires_at') and signup_entry['expires_at'] < datetime.utcnow():
+                del pending_signups[phone]
+                return format_error_response('Signup session expired')
+            
+            signup_data = signup_entry['data']
             
             return format_success_response({
                 'verified': True,
@@ -136,9 +161,16 @@ def complete_signup():
         print(f"📦 Pending signups keys: {list(pending_signups.keys())}")
         
         # Get pending signup data
-        signup_data = pending_signups.get(phone)
-        if not signup_data:
+        signup_entry = pending_signups.get(phone)
+        if not signup_entry:
             return format_error_response('Signup session expired')
+        
+        # Check if expired
+        if signup_entry.get('expires_at') and signup_entry['expires_at'] < datetime.utcnow():
+            del pending_signups[phone]
+            return format_error_response('Signup session expired')
+        
+        signup_data = signup_entry['data']
         
         # Update with confirmed data (allow edits from confirmation screen)
         signup_data['name'] = data.get('name', signup_data.get('name'))

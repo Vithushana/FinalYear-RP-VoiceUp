@@ -226,7 +226,8 @@ def get_reposted_issues():
                 
                 # CRITICAL: Filter by issue type to match officer's department
                 if officer.officer_type:
-                    query = query.filter(Post.issue_type == officer.officer_type)
+                    issue_type_filter = officer.officer_type.capitalize()
+                    query = query.filter(Post.issue_type == issue_type_filter)
         
         posts = query.order_by(Post.created_at.desc()).offset(skip).limit(limit).all()
         
@@ -484,8 +485,7 @@ def add_officer_reply(issue_id):
         # Create officer reply
         reply = OfficerReply(
             post_id=issue_id,
-            officer_id=1,  # TODO: Get from token
-            department=data.get('department', 'Road Development Authority (RDA)'),
+            officer_name=data.get('officer_name', 'Officer'),
             message=data['message']
         )
         
@@ -498,7 +498,7 @@ def add_officer_reply(issue_id):
             create_notification(
                 user_id=post.user_id,
                 title='Officer Reply',
-                message=f'Officer from {reply.department} replied: {reply.message[:50]}...',
+                message=f'{reply.officer_name} replied: {reply.message[:50]}...',
                 notification_type='officer_reply',
                 post_id=post.id,
                 action_url=f'/my-requests/{post.id}'
