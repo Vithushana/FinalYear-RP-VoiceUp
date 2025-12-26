@@ -1,78 +1,133 @@
-# ===============================
+# =====================================================
 # PYTHON
-# ===============================
+# =====================================================
 __pycache__/
 *.py[cod]
+*.so
+
+# Virtual environments
 venv/
 .venv/
+env/
+ENV/
 
-# ===============================
-# SECRETS & CREDENTIALS (CRITICAL)
-# ===============================
+# =====================================================
+# SECRETS & ENV FILES (IMPORTANT)
+# =====================================================
 .env
 *.env
 
-# Keep example env file for friends
+# Keep example env file for others
 !.env.example
 
-# ===============================
-# DATABASE & USER DATA (CRITICAL)
-# ===============================
-# SQLite database with user data, posts, etc.
+# =====================================================
+# DATABASE & USER DATA (DO NOT PUSH)
+# =====================================================
 *.db
 *.sqlite
 *.sqlite3
 
-# User uploaded images
+# User uploaded content
+uploads/
 application/backend/uploads/
 
-# ===============================
-# ML MODEL WEIGHTS (VERY LARGE FILES)
-# ===============================
-# YOLO model weights (50MB+ each)
+# =====================================================
+# MACHINE LEARNING MODELS & DATA (VERY LARGE)
+# =====================================================
+# Model weights
 *.pt
 *.pth
 *.weights
+*.onnx
+*.h5
+*.ckpt
 
-# Keep model directory structure but not weights
+# Training runs & outputs
+runs/
+weights/
+checkpoints/
+
+# Datasets (huge / long filenames)
+datasets/
+data/dataset/
+**/data/dataset/
+**/dataset/
+
+# Keep empty model folders if needed
 !models/.gitkeep
 
-# ===============================
-# FLUTTER
-# ===============================
+# =====================================================
+# FLUTTER / DART
+# =====================================================
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
-application/build/
-application/android/.gradle
-application/ios/Pods/
+.pub/
+.pub-cache/
+.packages
 
-# ===============================
-# NODE / REACT (WEBSITE)
-# ===============================
+# Flutter build outputs (CRITICAL)
+build/
+**/build/
+
+# =====================================================
+# ANDROID (CRITICAL – CAUSE OF YOUR ERROR)
+# =====================================================
+application/android/app/build/
+application/android/app/.cxx/
+application/android/build/
+application/android/.gradle/
+**/.cxx/
+
+# APKs / AABs
+*.apk
+*.aab
+
+# =====================================================
+# iOS / macOS (Flutter)
+# =====================================================
+application/ios/Pods/
+application/ios/Flutter/ephemeral/
+application/macos/Flutter/ephemeral/
+
+# =====================================================
+# NODE / REACT / WEBSITE
+# =====================================================
 node_modules/
+dist/
+.out/
+.next/
+coverage/
+
+# Lock files (optional but safe)
 package-lock.json
 bun.lockb
-dist/
+yarn.lock
+
+# =====================================================
+# LOGS & TEMP FILES
+# =====================================================
 *.log
-
-# ===============================
-# IDE & OS
-# ===============================
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-
-# ===============================
-# TEMPORARY FILES
-# ===============================
-backend_error.txt
-error_log.txt
 *.tmp
 *.temp
-# Datasets (too large / long filenames)
-component_vithushana/**/data/dataset/
-component_harish/**/data/dataset/
-**/data/dataset/
-**/dataset/
+backend_error.txt
+error_log.txt
+
+# =====================================================
+# IDE & OS FILES
+# =====================================================
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =====================================================
+# KEEP EMPTY FOLDERS (OPTIONAL)
+# =====================================================
+!.gitkeep
+
+# Gradle logs
+application/android/gradle_build_log.txt
