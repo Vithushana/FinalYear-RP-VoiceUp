@@ -58,11 +58,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     setState(() => _isLoadingLocation = true);
     
     try {
-      // Check permission
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
+      // ALWAYS request permission (don't check first)
+      // This ensures user gets prompted EVERY TIME they come to post screen
+      LocationPermission permission = await Geolocator.requestPermission();
       
       if (permission == LocationPermission.denied || 
           permission == LocationPermission.deniedForever) {

@@ -12,17 +12,17 @@ echo ============================================================
 echo.
 
 REM Terminal 1: Main Application Backend
-start "Main Backend (Port 5000)" cmd /k "cd /d new_version\application\backend && python app.py"
+start "Main Backend (Port 5000)" cmd /k "cd /d application\backend && python app.py"
 
 timeout /t 2 /nobreak >nul
 
 REM Terminal 2: Component 1 (Harish - Privacy/Relevance/Abuse)
-start "Component 1 (Port 5001)" cmd /k "cd /d new_version\component_harish && python component_service.py"
+start "Component 1 (Port 5001)" cmd /k "cd /d component_harish && python component_service.py"
 
 timeout /t 2 /nobreak >nul
 
 REM Terminal 3: Component 2 (Dual Service - AI/Garbage)
-start "Component 2 (Port 5002)" cmd /k "cd /d new_version\component_vithushana && python run_component_2.py"
+start "Component 2 (Port 5002)" cmd /k "cd /d component_vithushana && python run_component_2.py"
 
 echo.
 echo ✅ All services launched in separate windows!

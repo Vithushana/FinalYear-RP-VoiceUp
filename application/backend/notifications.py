@@ -112,16 +112,26 @@ def notify_all_region_officers_new_post(post):
         print(f"  - Issue Type: {post.issue_type}")
         print(f"  - Location: {post.location}")
         
-        # Get all officers for this region
-        officers = User.query.filter_by(
+        # Get all officers for this region AND matching issue type
+        # CRITICAL: Filter by officer_type to match post's issue_type
+        # NOTE: officer_type is lowercase ('road', 'garbage') but issue_type is capitalized ('Road', 'Garbage')
+        officer_type_filter = post.issue_type.lower() if post.issue_type else None
+        
+        officers_query = User.query.filter_by(
             is_officer=True,
             officer_province=post.province,
             officer_district=post.district,
             officer_region=post.region
-        ).all()
+        )
+        
+        if officer_type_filter:
+            officers_query = officers_query.filter_by(officer_type=officer_type_filter)
+        
+        officers = officers_query.all()
         
         print(f"\nOfficers Query:")
         print(f"  - Searching for officers in: {post.region}, {post.district}, {post.province}")
+        print(f"  - Officer Type Filter: {officer_type_filter}")
         print(f"  - Officers found: {len(officers)}")
         
         if not officers:
@@ -172,13 +182,20 @@ def notify_region_officers_status_change(post, new_status, changing_officer_id=N
         Number of notifications created
     """
     try:
-        # Get all officers for this region
-        officers = User.query.filter_by(
+        # Get all officers for this region AND matching issue type
+        officer_type_filter = post.issue_type.lower() if post.issue_type else None
+        
+        officers_query = User.query.filter_by(
             is_officer=True,
             officer_province=post.province,
             officer_district=post.district,
             officer_region=post.region
-        ).all()
+        )
+        
+        if officer_type_filter:
+            officers_query = officers_query.filter_by(officer_type=officer_type_filter)
+        
+        officers = officers_query.all()
         
         if not officers:
             return 0
@@ -388,12 +405,19 @@ def verify_completion(post_id):
                     
                     # 3. Notify ALL officers in region about new achievement
                     try:
-                        officers = User.query.filter_by(
+                        officer_type_filter = post.issue_type.lower() if post.issue_type else None
+                        
+                        officers_query = User.query.filter_by(
                             is_officer=True,
                             officer_province=post.province,
                             officer_district=post.district,
                             officer_region=post.region
-                        ).all()
+                        )
+                        
+                        if officer_type_filter:
+                            officers_query = officers_query.filter_by(officer_type=officer_type_filter)
+                        
+                        officers = officers_query.all()
                         
                         for officer in officers:
                             create_notification(

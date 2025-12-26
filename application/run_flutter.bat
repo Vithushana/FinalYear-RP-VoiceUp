@@ -19,7 +19,7 @@ echo.
 echo Starting Flutter app...
 echo.
 
-cd /d "C:\Users\Admin pc\Desktop\relevance_and_abuse_filteration_harish\new_version\application"
+cd /d "C:\Users\Admin pc\Desktop\FinalYear-RP-VoiceUp\application"
 
 REM Use full path to flutter.bat
 "C:\Users\Admin pc\Downloads\flutter_windows_3.38.5-stable\flutter\bin\flutter.bat" run
