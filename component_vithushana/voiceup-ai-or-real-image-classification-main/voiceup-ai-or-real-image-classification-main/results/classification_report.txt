@@ -1,0 +1,13 @@
+=== Test Results ===
+Test Loss: 0.0273
+Test Acc : 0.9714
+
+Classification Report:
+              precision    recall  f1-score   support
+
+          ai       1.00      0.95      0.97        20
+        real       0.94      1.00      0.97        15
+
+    accuracy                           0.97        35
+   macro avg       0.97      0.97      0.97        35
+weighted avg       0.97      0.97      0.97        35

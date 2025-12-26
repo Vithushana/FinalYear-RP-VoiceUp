@@ -1,0 +1,78 @@
+# ===============================
+# PYTHON
+# ===============================
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# ===============================
+# SECRETS & CREDENTIALS (CRITICAL)
+# ===============================
+.env
+*.env
+
+# Keep example env file for friends
+!.env.example
+
+# ===============================
+# DATABASE & USER DATA (CRITICAL)
+# ===============================
+# SQLite database with user data, posts, etc.
+*.db
+*.sqlite
+*.sqlite3
+
+# User uploaded images
+application/backend/uploads/
+
+# ===============================
+# ML MODEL WEIGHTS (VERY LARGE FILES)
+# ===============================
+# YOLO model weights (50MB+ each)
+*.pt
+*.pth
+*.weights
+
+# Keep model directory structure but not weights
+!models/.gitkeep
+
+# ===============================
+# FLUTTER
+# ===============================
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+application/build/
+application/android/.gradle
+application/ios/Pods/
+
+# ===============================
+# NODE / REACT (WEBSITE)
+# ===============================
+node_modules/
+package-lock.json
+bun.lockb
+dist/
+*.log
+
+# ===============================
+# IDE & OS
+# ===============================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ===============================
+# TEMPORARY FILES
+# ===============================
+backend_error.txt
+error_log.txt
+*.tmp
+*.temp
+# Datasets (too large / long filenames)
+component_vithushana/**/data/dataset/
+component_harish/**/data/dataset/
+**/data/dataset/
+**/dataset/
