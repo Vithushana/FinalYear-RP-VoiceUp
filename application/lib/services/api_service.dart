@@ -242,6 +242,8 @@ class ApiService {
         'flutter_response': flutterResponse,
         'final_decision': validationResult['final_decision'],
         'simple_notification': validationResult['simple_notification'],
+        'strike_warning': validationResult['strike_warning'],  // Pass strike warning
+        'strike_notification': validationResult['strike_notification'],  // Pass strike notification
       };
     }
     
