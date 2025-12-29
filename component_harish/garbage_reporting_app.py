@@ -1612,47 +1612,46 @@ def home():
 
             const decision = data.final_decision;
             const statusClass = decision.accepted ? 'status-accepted' : 'status-rejected';
-            const icon = decision.accepted ? '✅' : '❌';
+            const icon = decision.accepted ? ' ' : ' ';
             
             // Check if this is a text-only submission
             const isTextOnly = data.analysis && data.analysis.submission_type === 'text_only';
 
-            // Check for strike warnings
+            // Check for strike warnings (including warnings with strike_count=0)
             let strikeWarning = '';
-            if (data.strike_warning && data.strike_warning.has_strike) {
+            if (data.strike_warning) {
                 const strike = data.strike_warning;
                 let strikeColor = '#f39c12';
-                let strikeIcon = '⚠️';
+                let strikeIcon = ' ';
+                let strikeHeading = strike.title || ' Warning';
                 
                 if (strike.strike_count >= 3) {
                     strikeColor = '#e74c3c';
-                    strikeIcon = '🚨';
+                    strikeIcon = ' ';
                 } else if (strike.strike_count >= 2) {
                     strikeColor = '#e67e22';
-                    strikeIcon = '⛔';
+                    strikeIcon = ' ';
+                } else if (strike.strike_count >= 1) {
+                    strikeColor = '#ff6b6b';
+                    strikeIcon = ' ';
                 }
                 
                 strikeWarning = `
                     <div class="result-card" style="background-color: #fff3cd; border: 3px solid ${strikeColor}; border-left-width: 8px;">
-                        <h2 style="color: ${strikeColor}; margin-top: 0;">${strikeIcon} STRIKE ${strike.strike_count} ISSUED</h2>
-                        <p style="font-size: 1.2em; font-weight: bold; color: #721c24; margin: 15px 0;">
-                            ${strike.warning_message}
+                        <h2 style="color: ${strikeColor}; margin-top: 0;">${strikeIcon} ${strikeHeading}</h2>
+                        <p style="font-size: 1.1em; font-weight: bold; color: #721c24; margin: 15px 0;">
+                            ${strike.message}
                         </p>
                         <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid ${strikeColor};">
-                            <p style="margin: 5px 0; color: #333;"><strong>⏰ Strike Issued:</strong> ${strike.strike_time}</p>
-                            <p style="margin: 5px 0; color: #333;"><strong>📊 Total Strikes:</strong> ${strike.strike_count} / 3</p>
-                            <p style="margin: 5px 0; color: #333;"><strong>🔒 Block Status:</strong> ${strike.block_status}</p>
-                            ${strike.block_duration ? `<p style="margin: 5px 0; color: #e74c3c;"><strong>⏳ Block Duration:</strong> ${strike.block_duration}</p>` : ''}
-                            ${strike.unblock_time ? `<p style="margin: 5px 0; color: #27ae60;"><strong>🔓 Unblock Time:</strong> ${strike.unblock_time}</p>` : ''}
+                            <p style="margin: 5px 0; color: #333;"><strong> Strike Issued:</strong> ${strike.strike_time}</p>
+                            <p style="margin: 5px 0; color: #333;"><strong> Total Strikes:</strong> ${strike.strike_count} / 3</p>
+                            <p style="margin: 5px 0; color: #333;"><strong> Block Status:</strong> ${strike.block_status}</p>
+                            <p style="margin: 5px 0; color: #333;"><strong> Violation:</strong> ${strike.violation_reason}</p>
+                            <p style="margin: 5px 0; color: #666;"><strong> Total Violations:</strong> ${strike.total_violations}</p>
                         </div>
-                        <p style="font-size: 0.95em; color: #856404; background: #fff3cd; padding: 12px; border-radius: 5px; margin-top: 10px;">
-                            <strong>⚡ Important:</strong> ${strike.next_action}
-                        </p>
-                        ${strike.permanent_warning ? `
-                        <p style="font-size: 1.05em; color: #721c24; background: #f8d7da; padding: 15px; border-radius: 5px; margin-top: 10px; font-weight: bold; border: 2px solid #e74c3c;">
-                            🚨 ${strike.permanent_warning}
-                        </p>
-                        ` : ''}
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 15px; line-height: 1.6;">
+                            ${strike.detailed_explanation}
+                        </div>
                     </div>
                 `;
             }
@@ -1777,6 +1776,38 @@ def home():
 # In-memory strike storage (for testing - in production, use database)
 user_strikes = {}  # Format: {user_id: {'strike_count': 0, 'violations': [], 'temp_block_until': None, 'perm_blocked': False}}
 
+def clean_violation_reason(violation_type, violation_reason):
+    """Clean up violation reason to be user-friendly"""
+    # Remove technical model outputs like "abusive_content (1.00)"
+    import re
+    
+    # Map technical statuses to user-friendly messages
+    friendly_messages = {
+        'REJECTED - PRIVACY VIOLATION': 'Image contains people (privacy protection)',
+        'REJECTED - ABUSIVE IMAGE CONTENT': 'Image contains inappropriate content',
+        'REJECTED - ABUSIVE TEXT': 'Description contains inappropriate language',
+        'NOT A ROAD': 'Image does not show a road or street issue',
+        'REJECTED - NOT ROAD IMAGE': 'Image does not show a road or street issue',
+    }
+    
+    # Check if we have a friendly message for this type
+    if violation_type in friendly_messages:
+        return friendly_messages[violation_type]
+    
+    # Clean up technical details from reason
+    clean = violation_reason
+    # Remove model confidence scores like (1.00), (0.95), etc.
+    clean = re.sub(r'\s*\([0-9.]+\)', '', clean)
+    # Remove technical model names
+    clean = clean.replace('Abuse Detection:', '').replace('abusive_content', 'inappropriate content')
+    clean = clean.replace('Image contains:', '').strip()
+    
+    # Capitalize first letter
+    if clean:
+        clean = clean[0].upper() + clean[1:]
+    
+    return clean if clean else violation_reason
+
 def get_user_strike_info(user_id):
     """Get or initialize user strike information"""
     if user_id not in user_strikes:
@@ -1865,7 +1896,7 @@ def add_strike_to_user(user_id, violation_type, violation_reason):
             'strike_issued': True,
             'strike_count': 2,
             'warning_level': 'strike_2',
-            'title': '🔴 Strike 2 Issued - Final Warning',
+            'title': '🔴 Strike 2 - Final Warning',
             'message': f'You have received Strike 2 for continued violations ({violation_type}). This is your FINAL WARNING before temporary blocking.',
             'detailed_warning': f'Your submission was rejected because: {violation_reason}. This is your THIRD violation. You now have Strike 2 out of 3. We take community safety very seriously. You are one strike away from being temporarily blocked from using our platform.',
             'what_happens_next': '⚠️ CRITICAL: If you violate our guidelines ONE MORE TIME, you will be TEMPORARILY BLOCKED for 1 hour. After 3 strikes, temporary blocking will be enforced. Please follow ALL rules strictly.'
@@ -1951,40 +1982,46 @@ def check_image_api():
                 # First fault - Warning only (no strike count)
                 strike_level = 'warning'
                 strike_count = 0
-                strike_title = ''
-                strike_message = 'We noticed a violation in your submission. This is your first warning.'
-                strike_detail = f'Your submission was rejected because: {violation_reason}. Please follow our community guidelines. If you violate again, you will receive Strike 1.'
-                notification_title = 'First Warning Issued'
-                notification_message = 'Please review our community guidelines to avoid strikes.'
+                strike_title = '⚠️ First Warning'
+                # Clean up violation reason - remove technical details
+                clean_reason = clean_violation_reason(violation_type, violation_reason)
+                strike_message = f'Your submission was rejected: {clean_reason}'
+                strike_detail = f'This is your first violation. Please review our community guidelines. Next violation will result in Strike 1.'
+                notification_title = '⚠️ First Warning'
+                notification_message = f'{clean_reason}. Review guidelines to avoid strikes.'
             elif strike_cycle == 1:
                 # Strike 1
                 strike_level = 'strike_1'
                 strike_count = 1
-                strike_title = 'Strike 1 Issued'
-                strike_message = 'You have received Strike 1 for violating our community guidelines.'
-                strike_detail = f'Your submission was rejected because: {violation_reason}. This is a serious warning. One more violation will result in Strike 2.'
-                notification_title = 'Strike 1 Issued'
-                notification_message = 'You have received Strike 1. Please follow our guidelines carefully.'
+                strike_title = '🚨 Strike 1 Issued'
+                clean_reason = clean_violation_reason(violation_type, violation_reason)
+                strike_message = f'Strike 1: {clean_reason}'
+                strike_detail = f'This is your SECOND violation. You already received a warning. Do NOT repeat this mistake. Next violation = Strike 2.'
+                notification_title = '🚨 Strike 1 Issued'
+                notification_message = f'Strike 1: {clean_reason}. Next violation = Strike 2.'
             elif strike_cycle == 2:
                 # Strike 2
                 strike_level = 'strike_2'
                 strike_count = 2
-                strike_title = 'Strike 2 Issued - Final Warning'
-                strike_message = 'You have received Strike 2. This is your FINAL WARNING before Strike 3.'
-                strike_detail = f'Your submission was rejected because: {violation_reason}. You are one strike away from Strike 3. Please follow ALL rules strictly.'
-                notification_title = 'Strike 2 Issued'
-                notification_message = 'Final warning! One more violation will result in Strike 3.'
+                strike_title = '🔴 Strike 2 - FINAL WARNING'
+                clean_reason = clean_violation_reason(violation_type, violation_reason)
+                strike_message = f'Strike 2: {clean_reason}'
+                strike_detail = f'This is your THIRD violation. You are ONE strike away from Strike 3. STOP violating guidelines immediately. Follow ALL rules strictly.'
+                notification_title = '🔴 Strike 2 - FINAL WARNING'
+                notification_message = f'Strike 2: {clean_reason}. ONE more violation = Strike 3!'
             else:
                 # Strike 3
                 strike_level = 'strike_3'
                 strike_count = 3
-                strike_title = 'Strike 3 Issued'
-                strike_message = 'You have received Strike 3 for repeated violations.'
-                strike_detail = f'Your submission was rejected because: {violation_reason}. You have reached Strike 3. Please take this seriously and follow all community guidelines.'
-                notification_title = 'Strike 3 Issued'
-                notification_message = 'You have received Strike 3. Please follow our guidelines strictly.'
+                strike_title = '🚫 Strike 3 - MAXIMUM STRIKES'
+                clean_reason = clean_violation_reason(violation_type, violation_reason)
+                strike_message = f'Strike 3: {clean_reason}'
+                strike_detail = f'This is your FOURTH violation. You have reached MAXIMUM strikes (3/3). Follow ALL guidelines strictly to avoid account restrictions.'
+                notification_title = '🚫 Strike 3 - MAXIMUM STRIKES'
+                notification_message = f'Strike 3: {clean_reason}. Maximum strikes reached!'
 
             # Add strike info to result (for popup in Flutter app)
+            clean_reason = clean_violation_reason(violation_type, violation_reason)
             result['strike_warning'] = {
                 'has_strike': strike_count > 0,  # True for strikes 1-3, False for warning
                 'strike_level': strike_level,
@@ -1993,7 +2030,9 @@ def check_image_api():
                 'message': strike_message,
                 'detailed_explanation': strike_detail,
                 'strike_time': 'Just now',
-                'total_violations': user_info['strike_count']  # Track total violations for user
+                'total_violations': user_info['strike_count'],  # Track total violations for user
+                'block_status': 'No blocking applied' if strike_count < 3 else 'Maximum strikes - Follow guidelines strictly',
+                'violation_reason': clean_reason  # Include cleaned violation reason
             }
 
             # Add strike notification info (for dual notification system)

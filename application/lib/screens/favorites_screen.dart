@@ -205,7 +205,19 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       // Validation failed - show the popup with details
       print("✅ Handling validation failure in UI");
       if (mounted && response['flutter_response'] != null) {
-        _showFinalResultPopup(response['flutter_response']);
+        _showFinalResultPopup(
+          response['flutter_response'],
+          strikeWarning: response['strike_warning'],
+        );
+        
+        // Send dual notifications if strike was issued
+        if (response['strike_notification'] != null && 
+            response['strike_notification']['should_send'] == true) {
+          _sendStrikeNotifications(
+            response['flutter_response'],
+            response['strike_notification'],
+          );
+        }
       }
       setState(() => _isSubmitting = false);
       return;
@@ -309,13 +321,26 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
   
-  void _showFinalResultPopup(Map<String, dynamic> flutterResponse) {
+  void _showFinalResultPopup(
+    Map<String, dynamic> flutterResponse, {
+    Map<String, dynamic>? strikeWarning,
+  }) {
     final title = flutterResponse['title'] ?? 'Content Check Result';
     final message = flutterResponse['message'] ?? '';
     final detailedExplanation = flutterResponse['detailed_explanation'] ?? '';
     final whatToDoNext = flutterResponse['what_to_do_next'] ?? '';
     final canProceed = flutterResponse['can_proceed'] ?? false;
     final isStrikeSimulation = flutterResponse['is_strike_simulation'] ?? false;
+    
+    // Extract strike warning data
+    final hasStrike = strikeWarning != null;
+    final strikeTitle = strikeWarning?['title'] ?? '';
+    final strikeMessage = strikeWarning?['message'] ?? '';
+    final strikeDetail = strikeWarning?['detailed_explanation'] ?? '';
+    final strikeCount = strikeWarning?['strike_count'] ?? 0;
+    final totalViolations = strikeWarning?['total_violations'] ?? 0;
+    final blockStatus = strikeWarning?['block_status'] ?? '';
+    final violationReason = strikeWarning?['violation_reason'] ?? message;
     
     showDialog(
       context: context,
@@ -324,18 +349,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         title: Row(
           children: [
             Icon(
-              canProceed ? Icons.check_circle : Icons.warning,
-              color: canProceed ? Colors.green : Colors.orange,
-              size: 28,
+              canProceed ? Icons.check_circle : Icons.cancel_outlined,
+              color: canProceed ? Colors.green : Colors.red[700],
+              size: 30,
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 title,
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 19,
                   fontWeight: FontWeight.bold,
-                  color: canProceed ? Colors.green[700] : Colors.orange[800],
+                  color: canProceed ? Colors.green[700] : Colors.red[800],
                 ),
               ),
             ),
@@ -346,43 +371,241 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (message.isNotEmpty) ...[
-                Text(
-                  message,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              // Main rejection reason - prominent display
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.red[200]!, width: 1.5),
                 ),
-                const SizedBox(height: 16),
-              ],
-              if (detailedExplanation.isNotEmpty) ...[
-                Text(
-                  detailedExplanation,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red[700], size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Reason for Rejection',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red[900],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            violationReason,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-              ],
+              ),
+              
               if (whatToDoNext.isNotEmpty) ...[
+                const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.blue[50],
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[200]!),
+                    border: Border.all(color: Colors.blue[300]!, width: 1.5),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
-                      const SizedBox(width: 8),
+                      Icon(Icons.lightbulb_outline, color: Colors.blue[700], size: 22),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          whatToDoNext,
-                          style: TextStyle(fontSize: 13, color: Colors.blue[900]),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'What to do next',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[900],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              whatToDoNext,
+                              style: TextStyle(fontSize: 13, color: Colors.blue[800]),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
               ],
+              
+              // STRIKE WARNING DISPLAY - Improved UX
+              if (hasStrike) ...[
+                const SizedBox(height: 16),
+                Divider(color: Colors.grey[300], thickness: 1),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: strikeCount == 0 
+                          ? [Colors.orange[50]!, Colors.orange[100]!]
+                          : strikeCount == 1
+                              ? [Colors.red[50]!, Colors.red[100]!]
+                              : strikeCount == 2
+                                  ? [Colors.red[100]!, Colors.red[200]!]
+                                  : [Colors.red[200]!, Colors.red[300]!],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: strikeCount == 0 ? Colors.orange[600]! : Colors.red[600]!,
+                      width: 2.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (strikeCount == 0 ? Colors.orange : Colors.red).withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              strikeCount == 0 ? Icons.warning_amber_rounded : Icons.error_rounded,
+                              color: strikeCount == 0 ? Colors.orange[700] : Colors.red[700],
+                              size: 26,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              strikeTitle,
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: strikeCount == 0 ? Colors.orange[900] : Colors.red[900],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          strikeDetail,
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.4,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Current Strikes',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '$strikeCount / 3',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: strikeCount == 0 ? Colors.orange[800] : Colors.red[800],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Total Violations',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '$totalViolations',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[800],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              
               if (isStrikeSimulation) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -410,16 +633,123 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              'OK',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue[700],
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 2,
+              ),
+              child: const Text(
+                'I Understand',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  // Send dual notifications for strikes - Enhanced UX
+  void _sendStrikeNotifications(
+    Map<String, dynamic> flutterResponse,
+    Map<String, dynamic> strikeNotification,
+  ) {
+    final strikeCount = strikeNotification['strike_count'] ?? 0;
+    final strikeLevel = strikeNotification['strike_level'] ?? '';
+    
+    // Notification 1: Post rejection with icon
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.cancel, color: Colors.white, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Post Rejected',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    flutterResponse['message'] ?? 'Please review and try again',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.red[700],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+    
+    // Notification 2: Strike warning with enhanced styling
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  strikeCount == 0 ? Icons.warning_amber_rounded : Icons.error_rounded,
+                  color: Colors.white,
+                  size: 26,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        strikeNotification['title'] ?? 'Strike Issued',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        strikeNotification['message'] ?? '',
+                        style: const TextStyle(fontSize: 13),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: strikeCount == 0 ? Colors.orange[700] : Colors.red[800],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 5),
+            margin: const EdgeInsets.all(16),
+            action: SnackBarAction(
+              label: 'View',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    });
   }
 
   // Helper to convert base64 to bytes
