@@ -2245,62 +2245,80 @@ def check_image_api():
             return jsonify({'error': 'No image or text provided. Please provide at least one.'}), 400
         
         result = analyze_content(image_data, description)
-        
         # Check if violation occurred (rejection with strike)
         should_issue_strike = result.get('final_decision', {}).get('strike_issued', False)
-        print(f"🎯 Strike Check (SIMULATION MODE): should_issue_strike={should_issue_strike}, user_id={user_id}")
+        print(f"🎯 Strike Check: should_issue_strike={should_issue_strike}, user_id={user_id}")
         
         if should_issue_strike:
             violation_type = result['final_decision']['status']
             violation_reason = result['final_decision']['reason']
             
-            # ⚠️ TEMPORARY TESTING MODE: Always simulate strikes, never actually block users
-            print("⚠️ STRIKE SIMULATION MODE ACTIVE - Showing popup warnings only, no actual blocking")
-            strike_info = add_strike_to_user(user_id, violation_type, violation_reason)
+            # Dummy strike system - cycles through warning -> strike 1 -> strike 2 -> strike 3 -> back to warning
+            # Uses user_id hash to determine which strike to show (appears random but consistent per user)
+            import hashlib
+            user_hash = int(hashlib.md5(str(user_id).encode()).hexdigest(), 16)
+            strike_cycle = user_hash % 4  # 0=warning, 1=strike1, 2=strike2, 3=strike3
             
-            # Always show strike warning popup (simulation mode)
-            strike_count = strike_info.get('strike_count', 0)
-            if strike_info.get('block_type') == 'permanent':
-                block_status_msg = '⚠️ SIMULATION: Would be permanently blocked (Strike 5)'
-            elif strike_count == 3:
-                block_status_msg = '⚠️ SIMULATION: Would be temporarily blocked (Strike 3)'
-            elif strike_count == 2:
-                block_status_msg = '⚠️ SIMULATION: Final warning (Strike 2)'
-            elif strike_count == 1:
-                block_status_msg = '⚠️ SIMULATION: First strike warning'
+            # Determine strike level for this violation
+            if strike_cycle == 0:
+                # First fault - Warning only (no strike count)
+                strike_level = 'warning'
+                strike_count = 0
+                strike_title = '⚠️ First Warning'
+                strike_message = 'We noticed a violation in your submission. This is your first warning.'
+                strike_detail = f'Your submission was rejected because: {violation_reason}. Please follow our community guidelines. If you violate again, you will receive Strike 1.'
+                notification_title = '⚠️ First Warning Issued'
+                notification_message = 'Please review our community guidelines to avoid strikes.'
+            elif strike_cycle == 1:
+                # Strike 1
+                strike_level = 'strike_1'
+                strike_count = 1
+                strike_title = '🚨 Strike 1 Issued'
+                strike_message = 'You have received Strike 1 for violating our community guidelines.'
+                strike_detail = f'Your submission was rejected because: {violation_reason}. This is a serious warning. One more violation will result in Strike 2.'
+                notification_title = '🚨 Strike 1 Issued'
+                notification_message = 'You have received Strike 1. Please follow our guidelines carefully.'
+            elif strike_cycle == 2:
+                # Strike 2
+                strike_level = 'strike_2'
+                strike_count = 2
+                strike_title = '🔴 Strike 2 Issued - Final Warning'
+                strike_message = 'You have received Strike 2. This is your FINAL WARNING before Strike 3.'
+                strike_detail = f'Your submission was rejected because: {violation_reason}. You are one strike away from Strike 3. Please follow ALL rules strictly.'
+                notification_title = '🔴 Strike 2 Issued'
+                notification_message = 'Final warning! One more violation will result in Strike 3.'
             else:
-                block_status_msg = '⚠️ SIMULATION: Warning issued'
+                # Strike 3
+                strike_level = 'strike_3'
+                strike_count = 3
+                strike_title = '🚫 Strike 3 Issued'
+                strike_message = 'You have received Strike 3 for repeated violations.'
+                strike_detail = f'Your submission was rejected because: {violation_reason}. You have reached Strike 3. Please take this seriously and follow all community guidelines.'
+                notification_title = '🚫 Strike 3 Issued'
+                notification_message = 'You have received Strike 3. Please follow our guidelines strictly.'
             
+            # Add strike info to result (for popup in Flutter app)
             result['strike_warning'] = {
-                'has_strike': True,
-                'is_simulation': True,
-                'actual_blocking_disabled': True,
+                'has_strike': strike_count > 0,  # True for strikes 1-3, False for warning
+                'strike_level': strike_level,
                 'strike_count': strike_count,
-                'warning_message': f"⚠️ SIMULATION MODE: {strike_info.get('message', 'Violation detected')}",
-                'strike_time': 'Just now (simulation)',
-                'block_status': block_status_msg,
-                'block_duration': None,
-                'unblock_time': None,
-                'next_action': '✅ No action needed - This is only a warning popup. You can continue using the app.',
-                'simulation_note': 'Strike system is in testing mode. Users are NOT actually blocked or restricted.',
-                'permanent_warning': None
+                'title': strike_title,
+                'message': strike_message,
+                'detailed_explanation': strike_detail,
+                'strike_time': 'Just now'
             }
-            print(f"✅ Strike warning popup added (SIMULATION): Strike {strike_count}")
             
-            # Update flutter response to indicate simulation
-            if 'flutter_response' in result:
-                result['flutter_response']['is_strike_simulation'] = True
-                result['flutter_response']['can_continue'] = True
+            # Add strike notification info (for dual notification system)
+            result['strike_notification'] = {
+                'should_send': True,
+                'title': notification_title,
+                'message': notification_message,
+                'strike_count': strike_count,
+                'strike_level': strike_level
+            }
             
-        # Legacy code - now using simulation mode above for all cases
-            strike_info['web_test_mode'] = True
-            strike_info['note'] = '(Testing Mode - No actual blocking applied)'
-            result['strike_system'] = strike_info
+            print(f"✅ Strike warning added: {strike_level} (count: {strike_count})")
             
-            # Update flutter response with strike info for web testing
-            result['flutter_response']['strike_info'] = strike_info
-            result['flutter_response']['title'] = strike_info['title'] + ' (Test Mode)'
-        
         return jsonify(result)
         
     except Exception as e:

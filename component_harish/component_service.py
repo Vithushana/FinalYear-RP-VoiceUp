@@ -74,11 +74,18 @@ def create_simple_notification_message(validation_result):
             'type': 'warning'
         }
     
-    elif 'NOT A ROAD' in status:
+    elif 'NOT A ROAD' in status or 'NOT ROAD' in status:
         return {
             'title': '📸 Not a Road Image',
             'message': 'Your post was rejected because the image does not show a road or street problem.',
             'type': 'warning'
+        }
+    
+    elif 'GARBAGE' in status and 'NOT' not in status:
+        return {
+            'title': '🗑️ Garbage Detected',
+            'message': 'The image shows garbage or waste material.',
+            'type': 'info'
         }
     
     else:
