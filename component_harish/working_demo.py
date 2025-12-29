@@ -2254,10 +2254,12 @@ def check_image_api():
             violation_reason = result['final_decision']['reason']
             
             # Dummy strike system - cycles through warning -> strike 1 -> strike 2 -> strike 3 -> back to warning
-            # Uses user_id hash to determine which strike to show (appears random but consistent per user)
-            import hashlib
-            user_hash = int(hashlib.md5(str(user_id).encode()).hexdigest(), 16)
-            strike_cycle = user_hash % 4  # 0=warning, 1=strike1, 2=strike2, 3=strike3
+            # Both localhost and app: sequential ordering (warning, 1, 2, 3, warning, 1, 2, 3...)
+            # Track violations per user
+            user_info = get_user_strike_info(user_id)
+            strike_cycle = user_info['strike_count'] % 4  # 0=warning, 1=strike1, 2=strike2, 3=strike3
+            user_info['strike_count'] += 1
+            print(f"📊 Strike cycle: {strike_cycle} (user: {user_id}, total violations: {user_info['strike_count']})")
             
             # Determine strike level for this violation
             if strike_cycle == 0:
@@ -2305,7 +2307,8 @@ def check_image_api():
                 'title': strike_title,
                 'message': strike_message,
                 'detailed_explanation': strike_detail,
-                'strike_time': 'Just now'
+                'strike_time': 'Just now',
+                'total_violations': user_info['strike_count']  # Track total violations for user
             }
             
             # Add strike notification info (for dual notification system)
@@ -2317,7 +2320,7 @@ def check_image_api():
                 'strike_level': strike_level
             }
             
-            print(f"✅ Strike warning added: {strike_level} (count: {strike_count})")
+            print(f"✅ Strike warning added: {strike_level} (count: {strike_count}, total violations: {user_info['strike_count']})")
             
         return jsonify(result)
         
