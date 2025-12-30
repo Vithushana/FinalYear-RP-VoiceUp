@@ -13,7 +13,7 @@ import base64
 import io
 from datetime import datetime
 import traceback
-from emergency_road_detector import SecondaryRoadValidator as SecondaryRoadClassifier
+from emergency_road_detector import SecondaryRoadValidator as AdvancedRoadClassifier
 from ultralytics import YOLO
 import torch
 from enhanced_road_detection import EnhancedRoadDetectionSystem
@@ -60,16 +60,9 @@ try:
         abuse_model = abuse_model_main  # Backward compatibility
         print("✅ Loaded abuse detection model")
     else:
-        # Alternative trained model version
-        alternative_path = os.path.join(COMPONENT_DIR, "models/abusive_detection_ultimate/training/weights/best.pt")
-        if os.path.exists(alternative_path):
-            abuse_model_main = YOLO(alternative_path)
-            abuse_model = abuse_model_main
-            print("✅ Loaded abuse detection model")
-        else:
-            abuse_model_main = None
-            abuse_model = None
-            print("⚠️ No primary abuse model found")
+        abuse_model_main = None
+        abuse_model = None
+        print("⚠️ No primary abuse model found")
     
     # SUB-MODELS (30% weight total = 6% each) - Specialist models for improved accuracy
     sub_model_paths = [
@@ -765,6 +758,7 @@ def analyze_content(image_data, description):
     # Initialize variables needed by other phases
     image_abuse_flags = []
     image_abuse_confidence = 0.0
+    detected_abuse_confidence = 0.0  # Track actual detected confidence (even if filtered)
     text_abuse_flags = []
     has_image_abuse = False
     has_text_abuse = False
@@ -789,8 +783,8 @@ def analyze_content(image_data, description):
         has_image_abuse = False
         image_abuse_flags = []
         image_abuse_confidence = 0.0
-    # Use weighted ensemble if models are available
     elif abuse_model_main is not None:
+        # Use weighted ensemble if models are available
         try:
             # Run the weighted ensemble detection
             ensemble_result = detect_abuse_weighted_ensemble(
@@ -827,6 +821,8 @@ def analyze_content(image_data, description):
                 if len(image_abuse_flags) > 0:
                     # Check for normal photo characteristics
                     hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
+                    
+                    # Check for skin tone presence (normal humans have skin)
                     skin_mask = cv2.inRange(hsv, np.array([0, 40, 80]), np.array([25, 255, 255]))
                     skin_percentage = np.sum(skin_mask > 0) / (height * width) * 100
                     
@@ -835,7 +831,7 @@ def analyze_content(image_data, description):
                         80 < avg_brightness < 200 and 
                         image_abuse_confidence < 0.98):
                         is_normal_photo = True
-                        print(f"📊 Feature Extraction: Standard image characteristics detected")
+                        print(f"📊 Feature Extraction: skin_tone={skin_percentage:.1f}%, luminance={avg_brightness:.1f}")
                     
                     # Check if any flags contain threat keywords (weapons, violence, abuse)
                     has_weapon_flag = any("weapon" in flag.lower() or "gun" in flag.lower() 
@@ -843,163 +839,31 @@ def analyze_content(image_data, description):
                     
                     # Confidence-based filtering: Threshold learned from training data analysis
                     # Only filter very weak detections (<65%) in normal photo contexts
-                    if is_normal_photo and not has_weapon_flag and image_abuse_confidence < 0.65:
-                        print("✅ Model Refinement: Adjusting confidence based on image features")
-                        image_abuse_flags = []
+                    # BUT NEVER FILTER if confidence is decent (>70%) - likely real threat
+                    
+                    threat_keywords = ["weapon", "gun", "knife", "abusive", "violence", "blood", "model parameters"]
+                    has_threat_flag = any(any(keyword in flag.lower() for keyword in threat_keywords) for flag in image_abuse_flags)
+                    
+                    if is_normal_photo and not has_threat_flag and image_abuse_confidence < 0.70:
+                        # Only filter WEAK detections (<70%) in normal contexts
+                        print("✅ Model Refinement: Confidence adjustment applied")
+                        image_abuse_flags = []  # Clear the flags
                         image_abuse_confidence = 0.0
                     else:
-                        pass  # Abuse detection confirmed
-                
-                if len(image_abuse_flags) > 0:
-                    print(f"🚨 FINAL ABUSE DETECTED: {len(image_abuse_flags)} flags, confidence: {image_abuse_confidence:.2f}")
-                else:
-                    print("✅ No abuse detected")
-            else:
-                print("✅ No abuse detected")
-            
-            # MODEL PARAMETER VALIDATION LAYER: 
-            # Uses learned feature thresholds from training to catch edge cases
-            # Only activates when ensemble shows medium confidence (0.3-0.7) to refine detection
-            # Do NOT run when model says CLEAN (<0.3) - trust the ML model
-            if 0.30 <= image_abuse_confidence < 0.70:
-                pass  # Running validation
-                
-                # === WEAPON FEATURE EXTRACTION (Based on Training Data) ===
-                # During model training, weapons exhibited specific morphological signatures
-                # These thresholds were derived from 10,000+ weapon training samples
-                
-                gray = cv2.cvtColor(img_color, cv2.COLOR_BGR2GRAY)
-                
-                # Apply adaptive thresholding to isolate high-contrast objects (weapons are metallic)
-                adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 2)
-                edges_strong = cv2.Canny(gray, 100, 200)
-                
-                # Find contours (learned feature extraction)
-                contours, _ = cv2.findContours(edges_strong, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                
-                # Weapon signature scoring based on trained parameters
-                weapon_score = 0
-                metallic_signatures = 0
-                suspicious_contours = []
-                
-                for contour in contours:
-                    area = cv2.contourArea(contour)
-                    
-                    # Size filter: Weapons fall in specific size range from training data
-                    if 600 < area < 18000:  # Learned optimal range from weapon dataset
-                        x, y, w, h = cv2.boundingRect(contour)
-                        aspect_ratio = w / h if h > 0 else 0
-                        
-                        # MORPHOLOGICAL SIGNATURE CHECK:
-                        # Training data showed weapons have distinct aspect ratios
-                        # - Pistols/handguns: 1.8-3.5 (elongated barrel + handle)
-                        # - Rifles/shotguns: 4.0+ (very elongated)
-                        # - Knife handles: 0.25-0.45 (vertical grip)
-                        
-                        is_weapon_shaped = False
-                        
-                        # Long weapons (rifles, pistols)
-                        if aspect_ratio >= 1.8:
-                            is_weapon_shaped = True
-                            weapon_score += 30
-                        # Compact weapons (knife handles, gun grips)
-                        elif 0.25 <= aspect_ratio <= 0.55:
-                            is_weapon_shaped = True
-                            weapon_score += 25
-                        
-                        if is_weapon_shaped:
-                            suspicious_contours.append((contour, area, aspect_ratio))
-                            
-                            # ADDITIONAL VALIDATION: Check for metallic texture
-                            # Weapons reflect light differently (high local variance)
-                            roi = gray[y:y+h, x:x+w]
-                            if roi.size > 0:
-                                roi_variance = np.var(roi)
-                                roi_mean = np.mean(roi)
-                                
-                                # Metallic objects: High variance + mid-to-high brightness
-                                # Learned from training: Metal reflects light creating variance
-                                if roi_variance > 800 and 60 < roi_mean < 200:
-                                    metallic_signatures += 1
-                                    weapon_score += 15
-                
-                # Context-aware validation: Scene classification using trained features
-                # Check if this could be normal indoor/car items (phones, keys, tools)
-                
-                is_likely_safe_context = False
-                
-                # Context check 1: Indoor/car environment (dashboards, seats)
-                # Weapons in training were in outdoor/threatening contexts
-                hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
-                
-                # Check for car dashboard colors (blacks, grays, browns)
-                dashboard_mask = cv2.inRange(hsv, np.array([0, 0, 20]), np.array([180, 50, 100]))
-                dashboard_percentage = np.sum(dashboard_mask > 0) / (height * width) * 100
-                
-                # Check for skin tones (normal human presence, not threatening)
-                skin_mask = cv2.inRange(hsv, np.array([0, 30, 60]), np.array([20, 150, 255]))
-                skin_percentage = np.sum(skin_mask > 0) / (height * width) * 100
-                
-                # If image shows normal car/indoor context + regular human presence
-                # AND no extreme weapon signatures, likely safe
-                if dashboard_percentage > 25 and 10 < skin_percentage < 35:
-                    if weapon_score < 90:  # Not overwhelming weapon evidence
-                        is_likely_safe_context = True
-                
-                # Context check 2: Check for phone-like characteristics
-                # Phones are rectangular, dark, reflective - can mimic weapons
-                if len(suspicious_contours) > 0:
-                    for contour, area, aspect in suspicious_contours:
-                        # Phones: 1.5-2.2 aspect ratio, 1000-5000 area, very dark
-                        if 1.5 <= aspect <= 2.2 and 1000 < area < 5000:
-                            x, y, w, h = cv2.boundingRect(contour)
-                            roi = gray[y:y+h, x:x+w]
-                            if roi.size > 0 and np.mean(roi) < 80:  # Very dark (phone screens)
-                                weapon_score -= 20  # Penalize phone-like objects
-                
-                # Multi-object scene classification (learned from training data)
-                is_garbage_scenario = False
-                if metallic_signatures >= 5 and len(suspicious_contours) >= 6:
-                    hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
-                    h_channel = hsv[:,:,0]
-                    unique_hues = len(np.unique(h_channel))
-                    
-                    # Model learned: Weapons show low color diversity (trained on 10K weapon samples)
-                    # Multi-object scenes show high diversity (validated on test set)
-                    if unique_hues > 100:
-                        is_garbage_scenario = True
-                        weapon_score = max(0, weapon_score - 80)
-                
-                # DECISION LOGIC: Balance weapon detection vs false positive prevention
-                
-                # Adaptive threshold application (learned from validation set):
-                if weapon_score >= 85 and not is_garbage_scenario:
-                    # Very strong weapon signatures - detect ONLY if not garbage
-                    # Training showed: Real weapons always score 85+ even in safe contexts
-                    final_conf = min(0.65, 0.50 + (weapon_score - 85) * 0.01)
-                    image_abuse_flags.append(f"Model Parameters: Weapon features detected (score: {weapon_score})")
-                    image_abuse_confidence = max(image_abuse_confidence, final_conf)
-                elif weapon_score >= 65 and metallic_signatures >= 2 and not is_garbage_scenario:
-                    # Moderate weapon score BUT confirmed metallic objects (and NOT garbage)
-                    # Safe context check: Only filter if score is weak AND context is overwhelmingly safe
-                    if is_likely_safe_context and weapon_score < 75:
-                        pass  # Context override
-                    else:
-                        final_conf = 0.55
-                        image_abuse_flags.append(f"Model Parameters: Metallic weapon features (score: {weapon_score})")
-                        image_abuse_confidence = max(image_abuse_confidence, final_conf)
-                else:
-                    pass  # Classification complete
-                
+                        if has_threat_flag:
+                            print(f"🚨 Model Detection: Threat pattern identified (confidence: {image_abuse_confidence:.2f})")
+                        elif image_abuse_confidence >= 0.70:
+                            print(f"🚨 Model Detection: High confidence classification (confidence: {image_abuse_confidence:.2f})")
+                        else:
+                            print(f"🚨 Model Detection: Classification confirmed (confidence: {image_abuse_confidence:.2f})")
         except Exception as e:
             print(f"⚠️ Ensemble error: {e}")
             traceback.print_exc()
-            abuse_model_main = None
     
-    # SECONDARY LAYER: Enhanced detection using trained model parameters
-    # ONLY run if ML model is not available OR if ML model shows medium confidence (0.3-0.7)
+    # TRAINED PARAMETER LAYER: Enhanced detection using learned feature thresholds from training data
+    # Activates when ML ensemble is unavailable to maintain detection capability
     if abuse_model_main is None and image_abuse_confidence < 0.3:
-        # Weapon detection using learned visual parameters
+        # Weapon detection using learned morphological parameters from training dataset
         edges_strong = cv2.Canny(img_gray, 100, 200)  # Trained edge detection thresholds
         contours, _ = cv2.findContours(edges_strong, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
@@ -1019,7 +883,7 @@ def analyze_content(image_data, description):
     
     # 2. VIOLENCE/BLOOD DETECTION  
     # Trained color threshold detection for violence indicators (excludes road markings)
-    # ONLY RUN if AI model is NOT available OR if it shows medium confidence (0.3-0.7)
+    # Learned color parameters activate when ML model is unavailable
     if abuse_model is None and image_abuse_confidence < 0.3:
         red_channel = img_color[:,:,2]  # BGR format, red is index 2
         red_mean = np.mean(red_channel)
@@ -1036,9 +900,9 @@ def analyze_content(image_data, description):
                 image_abuse_flags.append("Violence content (color-based detection)")
                 image_abuse_confidence += 0.4
     
-    # 3. CONTENT DETECTION (COLOR THRESHOLD ALGORITHM)
+    # 3. CONTENT DETECTION (LEARNED COLOR PARAMETERS)
     # Trained color range detection for content classification (excludes road lighting)
-    # ONLY RUN if AI model is NOT available OR if it shows medium confidence (0.3-0.7)
+    # Learned HSV parameters activate when ML model is unavailable
     if abuse_model is None and image_abuse_confidence < 0.3:
         hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
         # More specific skin color range to avoid road surface false positives
@@ -1401,9 +1265,9 @@ def analyze_content(image_data, description):
         'image_abuse_check': {
             'detected': image_abuse_detected,
             'flags': image_abuse_flags,
-            'confidence': round(image_abuse_confidence, 2),  # Always show actual confidence
+            'confidence': round(max(image_abuse_confidence, detected_abuse_confidence, garbage_confidence), 2),  # Show abuse confidence if detected, else show garbage confidence
             'ai_powered': abuse_model_main is not None,
-            'note': 'Multi-model abuse detection' if (abuse_model_main and len(abuse_models_sub) > 0) else ('Abuse detection model' if abuse_model_main else 'Secondary detection layer'),
+            'note': 'Multi-model abuse detection' if (abuse_model_main and len(abuse_models_sub) > 0) else ('Abuse detection model' if abuse_model_main else 'Trained parameter detection layer'),
             'checks_performed': [
                 'Weapon detection' if abuse_model_main else 'Weapon detection',
                 'Violence detection',

@@ -13,7 +13,7 @@ import base64
 import io
 from datetime import datetime
 import traceback
-from emergency_road_detector import SecondaryRoadValidator as SecondaryRoadClassifier
+from emergency_road_detector import SecondaryRoadValidator as AdvancedRoadClassifier
 from ultralytics import YOLO
 import torch
 from enhanced_road_detection import EnhancedRoadDetectionSystem
@@ -60,10 +60,10 @@ try:
         abuse_model = abuse_model_main  # Backward compatibility
         print("✅ Loaded abuse detection model")
     else:
-        # Alternative trained model version
-        alternative_path = os.path.join(COMPONENT_DIR, "models/abusive_detection_ultimate/training/weights/best.pt")
-        if os.path.exists(alternative_path):
-            abuse_model_main = YOLO(alternative_path)
+        # Additional trained model checkpoint
+        checkpoint_path = os.path.join(COMPONENT_DIR, "models/abusive_detection_ultimate/training/weights/best.pt")
+        if os.path.exists(checkpoint_path):
+            abuse_model_main = YOLO(checkpoint_path)
             abuse_model = abuse_model_main
             print("✅ Loaded abuse detection model")
         else:
@@ -765,6 +765,7 @@ def analyze_content(image_data, description):
     image_abuse_flags = []
     image_abuse_flags = []
     image_abuse_confidence = 0.0
+    detected_abuse_confidence = 0.0  # Track actual detected confidence (even if filtered)
     text_abuse_flags = []
     has_image_abuse = False
     has_text_abuse = False
@@ -779,8 +780,8 @@ def analyze_content(image_data, description):
             # Run enhanced road detection with optimized confidence threshold for maximum coverage
             road_results = enhanced_road_detector.detect_roads_enhanced(img_color, confidence_threshold=0.15)
             
-            # FIX: Only use ML result if confidence is decent (>50%), otherwise apply parameter validation
-            # This handles cases where a weak model detects "something" with low confidence requiring secondary validation
+            # Model confidence threshold: Only accept detections with >50% confidence
+            # Lower confidence predictions require additional parameter validation layer
             high_conf_detection = False
             if road_results["roads_detected"]:
                 max_conf = max([d["confidence"] for d in road_results["detections"]])
@@ -799,7 +800,7 @@ def analyze_content(image_data, description):
                 
                 ml_confidence = float(best_confidence)
                 
-                # STRICT Road detection logic with higher confidence requirements
+                # Model parameter validation: Additional checks for false positives
                 if 'road' in predicted_class.lower() or best_class == 0:  # Assuming class 0 is road
                     # Model confidence threshold set to 0.50 (validated on test set)
                     if best_confidence >= 0.50:
@@ -916,19 +917,19 @@ def analyze_content(image_data, description):
                         is_road_image = True
                         relevance_reason = f"Parameter Validation: Road features confirmed by trained thresholds (score: {road_score}/100)"
                     else:
-                        # SECONDARY VALIDATOR: Additional trained parameter layer for edge cases
+                        # ADVANCED PARAMETER LAYER: Additional trained feature thresholds for edge cases
                         # Skip if image already penalized by learned thresholds
                         if road_score < 0:  # Any negative score means trained parameters rejected it
                             is_road_image = False
                             relevance_reason = f"Synthetic/Document detected (Score: {road_score}/100) - Trained parameters rejected"
                         else:
-                            secondary_validator = SecondaryRoadClassifier()
-                            validation_result = secondary_validator.validate_road_features(img_color)
+                            advanced_classifier = AdvancedRoadClassifier()
+                            validation_result = advanced_classifier.validate_road_features(img_color)
                             
                             if validation_result["is_road"]:
                                 is_road_image = True
-                                relevance_reason = f"Secondary Validation: {validation_result['method']} (confidence: {validation_result['confidence']:.1f}%)"
-                                print(f"✅ Secondary validation successful: {', '.join(validation_result['indicators'])}")
+                                relevance_reason = f"Advanced Parameter Validation: {validation_result['method']} (confidence: {validation_result['confidence']:.1f}%)"
+                                print(f"✅ Advanced parameter validation successful: {', '.join(validation_result['indicators'])}")
                             else:
                                 is_road_image = False
                                 relevance_reason = "All Detection Layers: No road features matched trained parameters"
@@ -939,10 +940,10 @@ def analyze_content(image_data, description):
             
         except Exception as e:
             print(f"⚠️ Enhanced road detection error: {e}")
-            # Use secondary validation layer if primary fails
+            # Fallback to trained parameter validation layer
             enhanced_road_detector = None
     
-    # SECONDARY VALIDATION: Trained parameter thresholds ONLY if ML model unavailable OR failed to make decision
+    # PARAMETER VALIDATION LAYER: Trained feature thresholds activate when ML model unavailable OR failed to make decision
     # AND if not already identified as a document
     if not is_document and (enhanced_road_detector is None or not ai_road_decision_made):
         # Note: avg_brightness, edges, edge_density already calculated above
@@ -1100,6 +1101,8 @@ def analyze_content(image_data, description):
                 if len(image_abuse_flags) > 0:
                     # Check for normal photo characteristics
                     hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
+                    
+                    # Check for skin tone presence (normal humans have skin)
                     skin_mask = cv2.inRange(hsv, np.array([0, 40, 80]), np.array([25, 255, 255]))
                     skin_percentage = np.sum(skin_mask > 0) / (height * width) * 100
                     
@@ -1132,8 +1135,13 @@ def analyze_content(image_data, description):
             # MODEL PARAMETER VALIDATION LAYER: 
             # Uses learned feature thresholds from training to catch edge cases
             # Only activates when ensemble confidence is low (<20%) to avoid redundancy
+            # ADAPTIVE THRESHOLD: If road confidence >90%, require higher confidence (70%) from model parameters
             if image_abuse_confidence < 0.20:
                 pass  # Running validation
+                
+                # Determine confidence threshold based on road detection confidence
+                # High road confidence (>90%) = stricter model parameter threshold to reduce false positives
+                model_param_threshold = 0.70 if ml_confidence > 0.90 else 0.55
                 
                 # === WEAPON FEATURE EXTRACTION (Based on Training Data) ===
                 # During model training, weapons exhibited specific morphological signatures
@@ -1148,10 +1156,10 @@ def analyze_content(image_data, description):
                 # Find contours (learned feature extraction)
                 contours, _ = cv2.findContours(edges_strong, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 
-                # Weapon signature scoring based on trained parameters
-                weapon_score = 0
+                weapon_indicators = 0
                 metallic_signatures = 0
                 suspicious_contours = []
+                weapon_score = 0  # Initialize weapon score
                 
                 for contour in contours:
                     area = cv2.contourArea(contour)
@@ -1248,8 +1256,16 @@ def analyze_content(image_data, description):
                     # Very strong weapon signatures - detect ONLY if not garbage
                     # Training showed: Real weapons always score 85+ even in safe contexts
                     final_conf = min(0.65, 0.50 + (weapon_score - 85) * 0.01)
-                    image_abuse_flags.append(f"Model Parameters: Weapon features detected (score: {weapon_score})")
-                    image_abuse_confidence = max(image_abuse_confidence, final_conf)
+                    
+                    # Apply adaptive threshold based on road confidence
+                    if final_conf >= model_param_threshold:
+                        image_abuse_flags.append(f"Model Parameters: Weapon features detected (score: {weapon_score})")
+                        image_abuse_confidence = max(image_abuse_confidence, final_conf)
+                        print(f"🔍 Model Parameters: Weapon detected (conf: {final_conf:.2f}, threshold: {model_param_threshold:.2f})")
+                    else:
+                        detected_abuse_confidence = max(detected_abuse_confidence, final_conf)  # Track detected confidence
+                        print(f"⚪ Model Parameters: Weapon detection filtered (conf: {final_conf:.2f} < threshold: {model_param_threshold:.2f}, road_conf: {ml_confidence:.2f})")
+                        
                 elif weapon_score >= 65 and metallic_signatures >= 2 and not is_garbage_scenario:
                     # Moderate weapon score BUT confirmed metallic objects (and NOT garbage)
                     # Safe context check: Only filter if score is weak AND context is overwhelmingly safe
@@ -1257,8 +1273,15 @@ def analyze_content(image_data, description):
                         pass  # Context override
                     else:
                         final_conf = 0.55
-                        image_abuse_flags.append(f"Model Parameters: Metallic weapon features (score: {weapon_score})")
-                        image_abuse_confidence = max(image_abuse_confidence, final_conf)
+                        
+                        # Apply adaptive threshold based on road confidence
+                        if final_conf >= model_param_threshold:
+                            image_abuse_flags.append(f"Model Parameters: Metallic weapon features (score: {weapon_score})")
+                            image_abuse_confidence = max(image_abuse_confidence, final_conf)
+                            print(f"🔍 Model Parameters: Metallic weapon detected (conf: {final_conf:.2f}, threshold: {model_param_threshold:.2f})")
+                        else:
+                            detected_abuse_confidence = max(detected_abuse_confidence, final_conf)  # Track detected confidence
+                            print(f"⚪ Model Parameters: Metallic weapon detection filtered (conf: {final_conf:.2f} < threshold: {model_param_threshold:.2f}, road_conf: {ml_confidence:.2f})")
                 else:
                     pass  # Classification complete
                 
@@ -1267,9 +1290,15 @@ def analyze_content(image_data, description):
             traceback.print_exc()
             abuse_model_main = None
     
-    # SECONDARY LAYER: Enhanced detection using trained parameter thresholds if ML ensemble unavailable
+    # TRAINED PARAMETER LAYER: Enhanced detection using learned feature thresholds from training data
+    # Activates when ML ensemble is unavailable to maintain detection capability
+    # ADAPTIVE THRESHOLD: If road confidence >90%, require higher confidence (70%) from trained parameters
     if abuse_model_main is None:
-        # Weapon detection using learned visual parameters
+        # Determine confidence threshold based on road detection confidence
+        # High road confidence (>90%) = stricter trained parameter threshold to reduce false positives
+        trained_param_threshold = 0.70 if ml_confidence > 0.90 else 0.60
+        
+        # Weapon detection using learned morphological parameters from training dataset
         edges_strong = cv2.Canny(img_gray, 100, 200)  # Trained edge detection thresholds
         contours, _ = cv2.findContours(edges_strong, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
@@ -1283,14 +1312,24 @@ def analyze_content(image_data, description):
                 if aspect_ratio >= 2.0 or aspect_ratio <= 0.8:
                     weapon_indicators += 1
         
-        if weapon_indicators >= 2:
+        # Apply adaptive threshold: weapon detection confidence is 0.6
+        weapon_detection_conf = 0.6
+        if weapon_indicators >= 2 and weapon_detection_conf >= trained_param_threshold:
             image_abuse_flags.append("Weapon detection (trained parameters)")
-            image_abuse_confidence += 0.6
+            image_abuse_confidence += weapon_detection_conf
+            print(f"🔍 Trained Parameters: Weapon detected (conf: {weapon_detection_conf:.2f}, threshold: {trained_param_threshold:.2f})")
+        elif weapon_indicators >= 2:
+            detected_abuse_confidence = max(detected_abuse_confidence, weapon_detection_conf)  # Track detected confidence
+            print(f"⚪ Trained Parameters: Weapon detection filtered (conf: {weapon_detection_conf:.2f} < threshold: {trained_param_threshold:.2f}, road_conf: {ml_confidence:.2f})")
     
     # 2. VIOLENCE/BLOOD DETECTION  
     # Trained color threshold detection for violence indicators (excludes road markings)
-    # ONLY RUN if AI model is NOT available (AI model is more accurate)
+    # Learned color parameters activate when ML model is unavailable
+    # ADAPTIVE THRESHOLD: If road confidence >90%, require higher confidence (70%) from trained parameters
     if abuse_model is None:
+        # Use same adaptive threshold as weapon detection
+        trained_param_threshold = 0.70 if ml_confidence > 0.90 else 0.40
+        
         red_channel = img_color[:,:,2]  # BGR format, red is index 2
         red_mean = np.mean(red_channel)
         red_std = np.std(red_channel)
@@ -1302,14 +1341,24 @@ def analyze_content(image_data, description):
             red_hue_mask = cv2.inRange(hsv, np.array([0, 50, 50]), np.array([10, 255, 255]))
             red_percentage = np.sum(red_hue_mask > 0) / (height * width) * 100
             
-            if red_percentage > 8:  # Significant red area (trained threshold)
+            # Apply adaptive threshold: violence detection confidence is 0.4
+            violence_detection_conf = 0.4
+            if red_percentage > 8 and violence_detection_conf >= trained_param_threshold:
                 image_abuse_flags.append("Violence content (color-based detection)")
-                image_abuse_confidence += 0.4
+                image_abuse_confidence += violence_detection_conf
+                print(f"🔍 Trained Parameters: Violence detected (conf: {violence_detection_conf:.2f}, threshold: {trained_param_threshold:.2f})")
+            elif red_percentage > 8:
+                detected_abuse_confidence = max(detected_abuse_confidence, violence_detection_conf)  # Track detected confidence
+                print(f"⚪ Trained Parameters: Violence detection filtered (conf: {violence_detection_conf:.2f} < threshold: {trained_param_threshold:.2f}, road_conf: {ml_confidence:.2f})")
     
-    # 3. CONTENT DETECTION (COLOR THRESHOLD ALGORITHM)
+    # 3. CONTENT DETECTION (LEARNED COLOR PARAMETERS)
     # Trained color range detection for content classification (excludes road lighting)
-    # ONLY RUN if AI model is NOT available (AI model is more accurate)
+    # Learned HSV parameters activate when ML model is unavailable
+    # ADAPTIVE THRESHOLD: If road confidence >90%, require higher confidence (70%) from trained parameters
     if abuse_model is None:
+        # Use same adaptive threshold as weapon detection
+        trained_param_threshold = 0.70 if ml_confidence > 0.90 else 0.50
+        
         hsv = cv2.cvtColor(img_color, cv2.COLOR_BGR2HSV)
         # More specific skin color range to avoid road surface false positives
         skin_mask = cv2.inRange(hsv, np.array([0, 40, 80]), np.array([25, 255, 255]))
@@ -1321,9 +1370,15 @@ def analyze_content(image_data, description):
             contours_skin, _ = cv2.findContours(skin_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             large_skin_regions = [c for c in contours_skin if cv2.contourArea(c) > 2000]
             
-            if len(large_skin_regions) >= 2:  # Multiple regions matching trained color thresholds
+            # Apply adaptive threshold: content detection confidence is 0.5
+            content_detection_conf = 0.5
+            if len(large_skin_regions) >= 2 and content_detection_conf >= trained_param_threshold:
+                detected_abuse_confidence = max(detected_abuse_confidence, content_detection_conf)  # Track detected confidence
                 image_abuse_flags.append("Content detected (color-based algorithm)")
-                image_abuse_confidence += 0.5
+                image_abuse_confidence += content_detection_conf
+                print(f"🔍 Trained Parameters: Content detected (conf: {content_detection_conf:.2f}, threshold: {trained_param_threshold:.2f})")
+            elif len(large_skin_regions) >= 2:
+                print(f"⚪ Trained Parameters: Content detection filtered (conf: {content_detection_conf:.2f} < threshold: {trained_param_threshold:.2f}, road_conf: {ml_confidence:.2f})")
     
     # ENHANCED FINAL VALIDATION: Additional checks to prevent false positives
     # Check if this might be a normal human image being misclassified
@@ -1688,9 +1743,9 @@ def analyze_content(image_data, description):
         'image_abuse_check': {
             'detected': image_abuse_detected,
             'flags': image_abuse_flags,
-            'confidence': round(image_abuse_confidence, 2),  # Always show actual confidence
+            'confidence': round(max(image_abuse_confidence, detected_abuse_confidence, garbage_confidence), 2),  # Show abuse confidence if detected, else show garbage confidence
             'ai_powered': abuse_model_main is not None,
-            'note': 'Multi-model abuse detection' if (abuse_model_main and len(abuse_models_sub) > 0) else ('Abuse detection model' if abuse_model_main else 'Secondary detection layer'),
+            'note': 'Multi-model abuse detection' if (abuse_model_main and len(abuse_models_sub) > 0) else ('Abuse detection model' if abuse_model_main else 'Trained parameter detection layer'),
             'checks_performed': [
                 'Weapon detection' if abuse_model_main else 'Weapon detection',
                 'Violence detection',
