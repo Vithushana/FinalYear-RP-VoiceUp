@@ -218,7 +218,7 @@ def analyze():
                 'status': 'ERROR',
                 'accepted': False,
                 'reason': str(e),
-                'strike_issued': False  # Strikes disabled
+                'strike_issued': False  # Strikes disabled for now
             },
             'simple_notification': {
                 'title': '❌ Error',
