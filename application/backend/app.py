@@ -12,7 +12,7 @@ from officer_routes import officer_bp
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from project root (FinalYear-RP-VoiceUp/.env)
+# Load the environment variables from project root (FinalYear-RP-VoiceUp/.env)
 project_root = os.path.join(os.path.dirname(__file__), '..', '..')
 load_dotenv(os.path.join(project_root, '.env'))
 
