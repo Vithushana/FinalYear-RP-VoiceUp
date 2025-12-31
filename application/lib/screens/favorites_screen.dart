@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:geolocator/geolocator.dart';
@@ -7,6 +8,8 @@ import '../widgets/custom_app_bar.dart';
 import '../navigation/bottom_nav_scaffold.dart';
 import '../services/api_service.dart';
 import '../widgets/location_picker.dart';
+import '../utils/location_helper_stub.dart'
+    if (dart.library.html) '../utils/location_helper_web.dart';
 
 class FavoritesScreen extends StatefulWidget {
   final List<String>? selectedImages;
@@ -57,14 +60,76 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _getCurrentLocation() async {
     setState(() => _isLoadingLocation = true);
     
+    if (kIsWeb) {
+      // Web: Use web location helper
+      _getLocationWeb();
+    } else {
+      // Mobile: Use Geolocator
+      _getLocationMobile();
+    }
+  }
+
+  Future<void> _getLocationWeb() async {
     try {
-      // ALWAYS request permission (don't check first)
-      // This ensures user gets prompted EVERY TIME they come to post screen
+      LocationHelperWeb.requestLocation(
+        (lat, lng) async {
+          setState(() {
+            _latitude = lat;
+            _longitude = lng;
+          });
+          
+          if (lat == 6.9147 && lng == 79.9729) {
+            setState(() {
+              _locationController.text = 'SLIIT, New Kandy Road, Malabe';
+              _isLoadingLocation = false;
+            });
+          } else {
+            // Real location - try geocoding
+            try {
+              final placemarks = await placemarkFromCoordinates(lat, lng);
+              if (placemarks.isNotEmpty) {
+                final place = placemarks.first;
+                final address = '${place.street}, ${place.locality}, ${place.administrativeArea}';
+                setState(() {
+                  _locationController.text = address;
+                });
+              } else {
+                setState(() {
+                  _locationController.text = 'Lat: ${lat.toStringAsFixed(6)}, Lng: ${lng.toStringAsFixed(6)}';
+                });
+              }
+            } catch (e) {
+              setState(() {
+                _locationController.text = 'Lat: ${lat.toStringAsFixed(6)}, Lng: ${lng.toStringAsFixed(6)}';
+              });
+            }
+            
+            setState(() => _isLoadingLocation = false);
+          }
+        },
+        (error) {
+          print('Web location error: $error');
+          setState(() {
+            _locationController.text = 'Could not get location. Please enter manually.';
+            _isLoadingLocation = false;
+          });
+        },
+      );
+    } catch (e) {
+      print('Web location exception: $e');
+      setState(() {
+        _locationController.text = 'Could not get location. Please enter manually.';
+        _isLoadingLocation = false;
+      });
+    }
+  }
+
+  Future<void> _getLocationMobile() async {
+    try {
       LocationPermission permission = await Geolocator.requestPermission();
       
       if (permission == LocationPermission.denied || 
           permission == LocationPermission.deniedForever) {
-        print('Location permission denied');
         setState(() {
           _isLoadingLocation = false;
           _locationController.text = 'Location permission denied. Please enter manually.';
@@ -72,7 +137,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         return;
       }
       
-      // Get current position
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -83,7 +147,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         _longitude = position.longitude;
       });
       
-      // Get address from coordinates
       final placemarks = await placemarkFromCoordinates(
         position.latitude,
         position.longitude,
@@ -97,7 +160,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         });
       }
     } catch (e) {
-      print('Error getting location: $e');
+      print('Mobile location error: $e');
       setState(() {
         _locationController.text = 'Could not get location. Please enter manually.';
       });

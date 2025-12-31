@@ -53,9 +53,11 @@ dependencies:
   # Location services
   geolocator: ^14.0.2
   geocoding: ^4.0.0
+  geolocator_web: ^4.1.1  # Web support for location
   
   # Google Maps
   google_maps_flutter: ^2.5.3
+  google_maps_flutter_web: ^0.5.10  # Web support for Google Maps
   
   # Package info
   package_info_plus: ^8.0.0

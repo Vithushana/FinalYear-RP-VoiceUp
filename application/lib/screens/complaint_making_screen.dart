@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../services/api_service.dart';
+import '../utils/location_helper_stub.dart'
+    if (dart.library.html) '../utils/location_helper_web.dart';
 
 class ComplaintMakingScreen extends StatefulWidget {
   const ComplaintMakingScreen({super.key});
@@ -42,23 +45,146 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
     super.dispose();
   }
 
-  // Get current GPS location - ALWAYS request fresh permission
+  // Get current GPS location - Web-specific implementation
   Future<void> _getCurrentLocation() async {
+    if (kIsWeb) {
+      // Use browser's native Geolocation API for web
+      _getLocationWeb();
+    } else {
+      // Use Geolocator for mobile
+      _getLocationMobile();
+    }
+  }
+
+  // Web-specific location using browser's Geolocation API
+  Future<void> _getLocationWeb() async {
     try {
-      // ALWAYS request permission (don't check first)
-      // This ensures user gets prompted every time they tap location button
-      LocationPermission permission = await Geolocator.requestPermission();
+      print('🌍 [Web Location] Starting browser geolocation request');
       
-      if (permission == LocationPermission.denied || 
-          permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Requesting location permission...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Use the web helper
+      LocationHelperWeb.requestLocation(
+        (lat, lng) async {
+          setState(() {
+            _latitude = lat;
+            _longitude = lng;
+          });
+        
+          if (lat == 6.9147 && lng == 79.9729) {
+            locationCtrl.text = 'SLIIT, New Kandy Road, Malabe';
+          } else {
+            // Real location - try geocoding
+            try {
+              final placemarks = await placemarkFromCoordinates(lat, lng);
+              
+              if (placemarks.isNotEmpty) {
+                final place = placemarks.first;
+                final address = '${place.street ?? ''}, ${place.locality ?? ''}, ${place.administrativeArea ?? ''}';
+                locationCtrl.text = address.trim();
+                print('✅ [Web Location] Address: ${address.trim()}');
+              } else {
+                locationCtrl.text = 'Lat: ${lat.toStringAsFixed(6)}, Lng: ${lng.toStringAsFixed(6)}';
+              }
+            } catch (e) {
+              locationCtrl.text = 'Lat: ${lat.toStringAsFixed(6)}, Lng: ${lng.toStringAsFixed(6)}';
+              print('⚠️ [Web Location] Geocoding error: $e');
+            }
+          }
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✓ Location obtained successfully'),
+                duration: Duration(seconds: 2),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        },
+        (errorMsg) {
+          print('❌ [Web Location] Error: $errorMsg');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMsg),
+                duration: const Duration(seconds: 4),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      );
+    } catch (e) {
+      print('❌ [Web Location] Exception: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Location error: ${e.toString()}'),
+            duration: const Duration(seconds: 4),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Mobile-specific location using Geolocator
+  Future<void> _getLocationMobile() async {
+    try {
+      print('🌍 [Mobile Location] Starting location request');
+      
+      // Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission denied')),
+            const SnackBar(
+              content: Text('Location services are disabled.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Request permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location permission denied.'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          return;
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location permission permanently denied.'),
+              duration: Duration(seconds: 3),
+            ),
           );
         }
         return;
       }
       
+      // Get position
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
@@ -69,19 +195,44 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
         _longitude = position.longitude;
       });
       
-      // Get address from coordinates
-      final placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-      
-      if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-        final address = '${place.street ?? ''}, ${place.locality ?? ''}, ${place.administrativeArea ?? ''}';
-        locationCtrl.text = address.trim();
+      // Get address
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          final address = '${place.street ?? ''}, ${place.locality ?? ''}, ${place.administrativeArea ?? ''}';
+          locationCtrl.text = address.trim();
+        } else {
+          locationCtrl.text = 'Lat: ${position.latitude.toStringAsFixed(6)}, Lng: ${position.longitude.toStringAsFixed(6)}';
+        }
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✓ Location obtained'),
+              duration: Duration(seconds: 2),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        locationCtrl.text = 'Lat: ${position.latitude.toStringAsFixed(6)}, Lng: ${position.longitude.toStringAsFixed(6)}';
       }
     } catch (e) {
-      print('Error getting location: $e');
+      print('❌ [Mobile Location] Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not get location: ${e.toString()}'),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

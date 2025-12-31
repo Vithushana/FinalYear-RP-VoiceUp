@@ -1,12 +1,12 @@
 {
-    "name": "voice_up_ime",
-    "short_name": "voice_up_ime",
+    "name": "VoiceUp - Issue Reporting",
+    "short_name": "VoiceUp",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#004C89",
+    "theme_color": "#004C89",
+    "description": "Report road and garbage issues in your community",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
