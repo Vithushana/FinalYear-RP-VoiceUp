@@ -1,6 +1,6 @@
 ===============================================================================
 COMPONENT HARISH - COMPLETE VIVA PREPARATION GUIDE
-AI-Powered Content Moderation & Validation System
+AI-Powered Content Moderation & Validation System (Relevancy and Abusive content filteration)
 ===============================================================================
 
 TABLE OF CONTENTS
@@ -24,13 +24,13 @@ TABLE OF CONTENTS
 What is VoiceUp?
 ----------------
 VoiceUp is an AI-powered road issue reporting platform where citizens can 
-report road problems (potholes, cracks, debris) through a mobile/web app.
+report local problems (potholes, cracks, debris, garbage) through a mobile/web app.
 
 The Problem You Solved
 -----------------------
 Without AI validation, users could submit:
-❌ Fake images (screenshots, documents, unrelated photos)
-❌ Abusive content (weapons, violence, inappropriate imagery)
+❌ Irrelevant images (screenshots, documents, unrelated photos)
+❌ Abusive content (weapons, violence, blood, abusive, 18+ and inappropriate imagery)
 ❌ Privacy violations (photos with identifiable people)
 ❌ Hate speech or abusive language in descriptions
 
@@ -53,7 +53,7 @@ Your Main Contributions:
 
 1. Road Relevance Detection System (8-model ensemble)
    - Validates that images actually show roads/streets
-   - Rejects screenshots, documents, indoor photos
+   - Rejects screenshots, documents, indoor photos, irrelevant images
    - Accuracy: 94.2%
 
 2. Abuse Detection System (6-model ensemble)
