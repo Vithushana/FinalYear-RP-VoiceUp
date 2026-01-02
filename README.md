@@ -43,7 +43,8 @@
 - **Abuse Detection**: 6-model weighted ensemble detects inappropriate content
 - **Text Moderation**: DistilBERT transformer for text abuse detection
 - **Privacy Protection**: Human detection with 90.6% mAP50 accuracy
-- **Garbage Classification**: 100% accuracy on validation set
+- **AI vs Real Detection**: ResNet-50 model distinguishes AI-generated from real photos
+- **Garbage Classification**: MobileNetV2 model for automatic garbage type detection
 
 ---
 
@@ -260,6 +261,12 @@ cd component_harish
 python working_demo.py
 ```
 
+#### **Component 2 Service (AI Detection + Garbage Classification):**
+```bash
+cd component_vithushana
+python run_component_2.py
+```
+
 #### **Flutter Mobile App:**
 ```bash
 cd application
@@ -468,6 +475,44 @@ Strikes are penalties for violating content policies.
 - Threats
 - Harassment
 
+### **5. AI vs Real Image Detection** (Component 2 - Vithushana)
+
+**Model**: ResNet-50 (fine-tuned)
+**Port**: 5002
+**Endpoint**: `/analyze`
+**Purpose**: Detect AI-generated images to prevent fake submissions
+
+**Features**:
+- Distinguishes AI-generated from real camera photos
+- Prevents manipulation with synthetic images
+- ResNet-50 architecture with custom classification head
+- Input size: 224x224 pixels
+
+**Classes**:
+- `ai`: AI-generated image (reject)
+- `real`: Real camera photo (accept)
+
+### **6. Garbage Type Classification** (Component 2 - Vithushana)
+
+**Model**: MobileNetV2 (fine-tuned)
+**Port**: 5002
+**Endpoint**: `/classify`
+**Purpose**: Auto-detect garbage type for quick reporting
+
+**Features**:
+- Real-time garbage classification
+- Auto-fills garbage type field in complaints
+- Lightweight MobileNetV2 for fast inference
+- Input size: 160x160 pixels
+
+**Detected Classes**:
+- Plastic waste
+- Paper/cardboard
+- Metal/cans
+- Glass
+- Organic waste
+- Mixed garbage
+
 ---
 
 ## 📡 API Documentation
@@ -657,7 +702,7 @@ FinalYear-RP-VoiceUp/
 │   │   └── routes.py          # API routes
 │   └── pubspec.yaml           # Flutter dependencies
 │
-├── component_harish/           # AI validation service
+├── component_harish/           # AI validation service (Harish)
 │   ├── working_demo.py        # Main validation script
 │   ├── models/                # Trained AI models
 │   │   ├── abuse_detection_final/
@@ -667,7 +712,16 @@ FinalYear-RP-VoiceUp/
 │   ├── emergency_road_detector.py
 │   └── distilbert_abuse_detector.py
 │
-├── component_vithushana/       # Additional components
+├── component_vithushana/       # AI detection services (Vithushana)
+│   ├── ai_real_detector.py    # AI vs Real image detection
+│   ├── garbage_classifier.py  # Garbage type classification
+│   ├── run_component_2.py     # Service launcher (Port 5002)
+│   ├── voiceup-ai-or-real-image-classification-main/
+│   │   └── models/
+│   │       └── resnet50_ai_vs_real.pth
+│   └── Garbage_Classification-main/
+│       └── garbage_model.pth
+│
 ├── website/                    # Landing page
 ├── .env                        # Environment variables
 ├── .gitignore                 # Git ignore rules
@@ -678,8 +732,19 @@ FinalYear-RP-VoiceUp/
 
 ## 👥 Contributors
 
-- **Harish** - AI/ML Engineer (Content Moderation System)
-- **Vithushana** - Full Stack Developer (Flutter App & Backend)
+- **Harish** - AI/ML Engineer
+  - Content Moderation System (Road detection, Abuse detection, Privacy protection, Text moderation)
+  - 8-model road detection ensemble
+  - 6-model abuse detection ensemble
+  - Human detection for privacy
+  - DistilBERT text abuse detection
+  
+- **Vithushana** - Full Stack Developer & AI Engineer
+  - Flutter mobile/web application
+  - Flask backend API
+  - AI vs Real image detection (ResNet-50)
+  - Garbage type classification (MobileNetV2)
+  - Component 2 service (Port 5002)
 
 ---
 
