@@ -113,7 +113,7 @@ try:
         privacy_model = YOLO(human_model_path)
         print("✅ TRAINED Human detection model loaded (90.6% mAP50)")
     else:
-        # Pre-trained base model for privacy detection
+        # Trained base model for privacy detection
         try:
             privacy_model = YOLO('yolov8n.pt')  # Base model with person detection capability
             print("✅ Base human detection model loaded")
@@ -285,7 +285,7 @@ def detect_abuse_weighted_ensemble(image, main_model, sub_models, confidence_thr
         try:
             main_results = main_model(image, verbose=False)
             
-            if len(main_results) > 0 and len(main_results[0].boxes) > 0:
+            if len(main_results) > 0 and len(main_results[0].boxes) > 0: #extract results
                 boxes = main_results[0].boxes
                 confidences = boxes.conf.cpu().numpy()
                 classes = boxes.cls.cpu().numpy()
@@ -435,7 +435,7 @@ def detect_abuse_weighted_ensemble(image, main_model, sub_models, confidence_thr
         print(f"❌ Ensemble error: {e}")
         return {'detected': False, 'confidence': 0.0, 'detections': [], 'model_votes': {}}
 
-# ML TEXT ANALYSIS HELPER
+# ML TEXT ANALYSIS
 def analyze_text_with_ai(text):
     """
     Analyze text using the fine-tuned DistilBERT model

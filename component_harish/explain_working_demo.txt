@@ -1,0 +1,607 @@
+================================================================================
+WORKING_DEMO.PY - LINE-BY-LINE EXPLANATION FOR VIVA
+================================================================================
+Student: Harish
+Purpose: Content Moderation System for Road Issue Reporting Platform
+Date: Prepared for Viva Defense
+
+================================================================================
+SECTION 1: IMPORTS AND SETUP (Lines 1-31)
+================================================================================
+
+Lines 7-19: IMPORT STATEMENTS
+------------------------------
+WHY: These libraries provide essential functionality for the system
+
+- Flask: Web framework to create the API server
+- cv2 (OpenCV): Computer vision library for image processing
+- numpy: Mathematical operations on images (arrays)
+- base64: Decode images sent from Flutter app
+- datetime: Track when violations occur
+- traceback: Debug errors by showing full error details
+- YOLO (ultralytics): Deep learning model for object detection
+- torch: PyTorch framework (YOLO runs on this)
+- EnhancedRoadDetectionSystem: Custom 8-model ensemble for road detection
+- AdvancedRoadClassifier: Backup classifier using image parameters
+
+Lines 21-22: COMPONENT_DIR
+---------------------------
+WHY: Get the absolute path of current directory
+PURPOSE: Load models from correct location regardless of where script runs
+EXAMPLE: If script is in /component_harish/, models are in /component_harish/models/
+
+Lines 23-28: DISTILBERT IMPORT
+-------------------------------
+WHY: Try to import text abuse detection model
+TRY-EXCEPT: If model not found, system still works (graceful degradation)
+DISTILBERT_AVAILABLE flag: Tells system whether to use AI text analysis
+
+Lines 30-31: FLASK APP SETUP
+-----------------------------
+app = Flask(__name__): Create web server
+MAX_CONTENT_LENGTH = 16MB: Prevent users from uploading huge files (DoS protection)
+
+================================================================================
+SECTION 2: MODEL LOADING (Lines 33-148)
+================================================================================
+
+Lines 36-43: INITIALIZE MODEL VARIABLES
+----------------------------------------
+WHY: Declare variables before loading to avoid "undefined" errors
+abuse_model_main: Primary abuse detection model (70% weight in ensemble)
+abuse_models_sub: List of 5 specialist models (30% weight total)
+enhanced_road_detector: 8-model road detection system
+privacy_model: Human detection for privacy protection
+garbage_model: Garbage classification model
+
+Lines 45-51: LOAD ENHANCED ROAD DETECTOR
+-----------------------------------------
+WHY: Uses 8 trained YOLO models voting together for accurate road detection
+TRY-EXCEPT: If loading fails, system falls back to parameter-based detection
+PRINT: Shows user which models loaded successfully
+
+Lines 53-108: LOAD ABUSE DETECTION ENSEMBLE
+--------------------------------------------
+WHY: Multiple models catch more abuse than single model
+
+Line 57-72: MAIN MODEL (70% weight)
+- Checks two possible paths for primary model
+- This model has highest influence in final decision
+- Backward compatibility: abuse_model = abuse_model_main
+
+Lines 74-101: SUB-MODELS (30% weight, 6% each)
+- 5 specialist models trained on different abuse subsets
+- Lines 86-92: Check if file is Git LFS pointer (not actual model)
+  WHY: Git LFS stores large files separately; pointer file is just text
+- enumerate(start=2): Number models as 2,3,4,5,6 for logging
+- Each model loaded into abuse_models_sub list
+
+Lines 103-108: VALIDATION
+- Confirm how many models loaded successfully
+- System works even with just main model
+
+Lines 110-122: LOAD HUMAN DETECTION MODEL
+------------------------------------------
+WHY: Detect people in images to protect privacy
+Line 111: Custom trained model (90.6% mAP50 accuracy)
+Lines 116-122: Fallback to YOLOv8 base model if custom model missing
+  - yolov8n.pt: Pretrained on COCO dataset (includes person class)
+
+Lines 124-131: LOAD GARBAGE CLASSIFIER
+---------------------------------------
+WHY: Classify if road has garbage/litter
+Line 128: "100% accuracy" - achieved on validation set
+Used for informational purposes, doesn't reject submissions
+
+Lines 139-146: LOAD DISTILBERT TEXT MODEL
+------------------------------------------
+WHY: Analyze text descriptions for abusive language
+DistilBERT: Transformer model fine-tuned on abuse detection
+Only loads if DISTILBERT_AVAILABLE = True
+
+================================================================================
+SECTION 3: PRIVACY PROTECTION FUNCTION (Lines 150-240)
+================================================================================
+
+Lines 151-157: FUNCTION SIGNATURE
+----------------------------------
+INPUT: image (numpy array)
+OUTPUT: (detected, confidence) tuple
+  - detected: True if human found (reject for privacy)
+  - confidence: How confident model is (0.0 to 1.0)
+
+Lines 160-161: CHECK IF MODEL AVAILABLE
+----------------------------------------
+WHY: If privacy_model = None, can't detect humans
+RETURN: (False, 0.0) = assume safe, proceed normally
+
+Lines 164-165: RUN HUMAN DETECTION
+-----------------------------------
+privacy_model(image, verbose=False): Run YOLO inference
+verbose=False: Don't print debug output
+
+Lines 167-174: EXTRACT DETECTIONS
+----------------------------------
+max_human_confidence: Track highest confidence detection
+boxes.cls: Class IDs (0 = person in COCO dataset)
+boxes.conf: Confidence scores (0.0 to 1.0)
+boxes.xyxy: Bounding box coordinates [x1, y1, x2, y2]
+
+Lines 177-179: CONFIDENCE THRESHOLD
+------------------------------------
+WHY: int(cls) == 0 checks if detection is "person" class
+conf > 0.45: Relaxed threshold to catch more people
+ORIGINAL: 0.55, LOWERED to 0.45 to be more sensitive
+
+Lines 181-194: SIZE CHECK
+--------------------------
+WHY: Ignore tiny detections (noise, distant people)
+box_area / image_area < 0.01: Less than 1% of image
+EXAMPLE: 1920x1080 image = 2,073,600 pixels
+  1% = 20,736 pixels = 144x144 box
+  Anything smaller is ignored
+
+Lines 196-211: REALISM CHECK
+-----------------------------
+WHY: Distinguish real humans from icons/cartoons/drawings
+
+Line 205: TEXTURE CHECK (Laplacian Variance)
+- Laplacian: Edge detection operator
+- var(): Variance measures texture complexity
+- Real photos: High variance (skin texture, clothes, hair)
+- Icons/cartoons: Low variance (flat colors)
+
+Lines 207-211: COLOR COMPLEXITY CHECK
+- Histogram: Distribution of pixel intensities
+- top_5_sum: Sum of top 5 most common intensities
+- Real photos: Complex distribution (many colors)
+- Icons: Simple distribution (few colors)
+
+Lines 213-227: DECISION LOGIC
+------------------------------
+Line 221: top_5_sum > 0.60 = Extremely uniform (flat icon)
+Line 224: laplacian_var < 10 AND conf < 0.60 = Very flat AND low confidence
+WHY: Avoid false positives from dashboard icons, warning signs
+
+Lines 232-234: REAL HUMAN DETECTED
+-----------------------------------
+Print warning, update max_human_confidence
+RETURN immediately: No need to check more detections
+
+Line 236: NO HUMANS DETECTED
+-----------------------------
+RETURN (False, 0.0): Safe for privacy
+
+================================================================================
+SECTION 4: ENSEMBLE ABUSE DETECTION (Lines 242-436)
+================================================================================
+
+Lines 247-263: FUNCTION PURPOSE
+--------------------------------
+WHY: 6 models voting together more accurate than 1 model
+ADAPTIVE WEIGHTING: High-confidence models get more influence
+AGREEMENT BOOSTING: Multiple models agreeing increases confidence
+CLASS-SPECIFIC THRESHOLDS: Different abuse types need different thresholds
+
+Lines 265-266: VALIDATION
+--------------------------
+If main_model = None, return empty result (no detection possible)
+
+Lines 268-277: CLASS-SPECIFIC THRESHOLDS
+-----------------------------------------
+WHY: Different abuse types have different detection difficulty
+'weapon': 0.45 - Lower threshold (weapons are critical threats)
+'violence': 0.60 - Moderate threshold
+'blood': 0.65 - Higher threshold (avoid false positives from red objects)
+'default': 0.50 - Standard threshold
+
+Lines 280-282: INITIALIZE TRACKING
+-----------------------------------
+all_detections: Store all raw detections from all models
+class_predictions: Dictionary mapping class -> list of (conf, source, weighted_conf)
+model_votes: Track which models detected what
+
+Lines 284-322: STEP 1 - RUN MAIN MODEL (70% weight)
+----------------------------------------------------
+Line 286: main_model(image, verbose=False) - Run inference
+
+Lines 288-292: EXTRACT RESULTS
+- boxes.conf: Confidence scores
+- boxes.cls: Class IDs
+- class_names: Dictionary mapping ID -> name (e.g., 0 -> 'weapon')
+
+Lines 295-313: PROCESS EACH DETECTION
+Line 301: ADAPTIVE WEIGHTING FORMULA
+  adaptive_weight = 0.70 + (0.05 * conf_float) - 0.025
+  WHY: High confidence (0.9) gets 0.70 + 0.045 - 0.025 = 0.72 (72% weight)
+       Low confidence (0.5) gets 0.70 + 0.025 - 0.025 = 0.70 (70% weight)
+  RESULT: Confident predictions get slightly more weight
+
+Line 302: weighted_conf = conf * adaptive_weight
+  EXAMPLE: 0.8 confidence * 0.715 weight = 0.572 weighted score
+
+Lines 324-366: STEP 2 - RUN SUB-MODELS (30% weight)
+----------------------------------------------------
+Line 325: base_weight_per_sub = 0.30 / 5 = 0.06 (6% each)
+
+Line 344: ADAPTIVE SUB-MODEL WEIGHT
+  adaptive_weight = base_weight * (0.9 + 0.2 * conf_float)
+  WHY: High-confidence specialist predictions get more weight
+  EXAMPLE: 0.06 * (0.9 + 0.2*0.8) = 0.06 * 1.06 = 0.0636
+
+Lines 368-389: STEP 3 - AGREEMENT BOOSTING
+-------------------------------------------
+Line 373: base_score = sum of all weighted confidences for this class
+
+Lines 377-386: AGREEMENT MULTIPLIER
+- 3+ models agree: 1.0 + 0.08*(num-2) = +8% per additional model
+  EXAMPLE: 4 models = 1.0 + 0.08*2 = 1.16 (16% boost)
+- 2 models agree: 1.05 (5% boost)
+- 1 model: No boost
+
+Line 389: Cap at 1.0 (100% confidence maximum)
+
+Lines 399-405: STEP 4 - APPLY CLASS-SPECIFIC THRESHOLDS
+--------------------------------------------------------
+Line 400: best_class = class with highest score
+Line 404: Get threshold for this specific class
+Line 405: detected = score >= threshold
+
+Lines 407-418: COMPILE FINAL DETECTIONS
+----------------------------------------
+Only include classes that exceed their specific threshold
+Track how many models contributed to each detection
+
+Line 423: PRINT RESULT
+-----------------------
+Show emoji (🚨 if detected, ✅ if clean)
+Show best class and confidence
+
+================================================================================
+SECTION 5: TEXT ANALYSIS (Lines 438-459)
+================================================================================
+
+Lines 439-443: FUNCTION PURPOSE
+--------------------------------
+Analyze text using fine-tuned DistilBERT transformer model
+RETURNS: (is_abusive, category, confidence)
+
+Lines 446-447: CHECK MODEL AVAILABILITY
+----------------------------------------
+If distilbert_pipeline = None, return (False, None, 0.0)
+
+Line 451: RUN INFERENCE
+------------------------
+distilbert_pipeline.predict(text, threshold=0.50)
+threshold=0.50: STRICT threshold for government platform
+WHY: False negatives (missing abuse) worse than false positives
+
+================================================================================
+SECTION 6: MAIN ANALYSIS FUNCTION - TEXT-ONLY PATH (Lines 462-539)
+================================================================================
+
+Lines 470-474: TEXT-ONLY FAST PATH
+-----------------------------------
+WHY: If user provides only text (no image), skip image models
+SAVES: ~300ms processing time + GPU resources
+CHECK: not image_data AND description exists
+
+Lines 476-499: TEXT ANALYSIS
+-----------------------------
+Line 483: analyze_text_with_ai(description)
+Lines 489-493: Store results in text_analysis dictionary
+Lines 495-499: ERROR HANDLING
+  If analysis fails, fail-open (allow submission)
+  WHY: Don't block users due to technical errors
+
+Lines 501-520: TEXT ABUSE DETECTED
+-----------------------------------
+Return rejection response with:
+- status: 'TEXT_ABUSE'
+- accepted: False
+- strike_issued: True (user gets strike)
+- submission_type: 'text_only'
+
+Lines 521-539: TEXT CLEAN
+--------------------------
+Return acceptance response
+No image checks needed
+
+================================================================================
+SECTION 7: IMAGE DECODING (Lines 541-630)
+================================================================================
+
+Lines 543-549: VALIDATE INPUT
+------------------------------
+Check if image_data exists
+Check if length >= 50 (minimum for valid base64)
+
+Lines 551-561: EXTRACT BASE64 DATA
+-----------------------------------
+WHY: Flutter sends images as data URLs: "data:image/jpeg;base64,/9j/4AAQ..."
+Split by comma, take part after comma
+If no comma, assume raw base64
+
+Lines 563-569: CLEAN BASE64
+----------------------------
+Line 564: strip() removes whitespace
+Lines 567-569: Add padding if needed
+  WHY: Base64 requires length divisible by 4
+  EXAMPLE: "abc" needs "abc=" to be valid
+
+Lines 571-578: DECODE BASE64
+-----------------------------
+Line 573: base64.b64decode() converts string to bytes
+Line 577: Check if result >= 100 bytes (minimum for image)
+
+Lines 580-595: DECODE IMAGE WITH OPENCV
+----------------------------------------
+Line 581: np.frombuffer() converts bytes to numpy array
+Line 584: cv2.imdecode() decodes JPEG/PNG to image matrix
+Lines 587-592: FALLBACK
+  Try IMREAD_UNCHANGED if IMREAD_COLOR fails
+  WHY: Some images have alpha channel
+
+Lines 597-608: CONVERT TO GRAYSCALE
+------------------------------------
+Line 598: cv2.cvtColor() converts BGR to grayscale
+WHY: Many algorithms work on grayscale (faster, simpler)
+Line 604: height, width = img_gray.shape[:2]
+
+Lines 610-625: ERROR HANDLING
+------------------------------
+Print error, add helpful message about unsupported formats
+AVIF/HEIC: Modern formats not supported by OpenCV
+Return error response (don't crash)
+
+Lines 627-630: BASIC IMAGE ANALYSIS
+------------------------------------
+avg_brightness: Mean pixel intensity (0-255)
+edges: Canny edge detection
+edge_density: Percentage of pixels that are edges
+
+================================================================================
+SECTION 8: PRIVACY CHECK (Lines 632-643)
+================================================================================
+
+Lines 637-638: RUN HUMAN DETECTION
+-----------------------------------
+Call detect_humans_for_privacy() function
+Returns (humans_detected, human_detection_confidence)
+
+Lines 640-643: LOG RESULTS
+---------------------------
+If humans detected: Print warning (will reject later)
+If no humans: Print success (safe to proceed)
+
+================================================================================
+SECTION 9: DOCUMENT DETECTION (Lines 647-755)
+================================================================================
+
+WHY: Papers/documents often misclassified as roads by ML models
+GOAL: Pre-filter documents before road detection
+
+Lines 651-665: INITIALIZE
+--------------------------
+is_document = False
+Calculate text line patterns using morphological operations
+Calculate histogram uniformity
+
+Lines 667-696: CASE A - BRIGHT PAPER
+-------------------------------------
+Line 670: avg_brightness > 140 (learned from training data)
+
+Lines 673-688: THREE INDICATORS
+Indicator 1: text_line_ratio > 0.004 (horizontal line patterns)
+Indicator 2: top_5_sum > 0.35 (uniform color distribution)
+Indicator 3: color_variance < 50 (grayscale, no color variation)
+
+Line 691: DECISION
+  Need >= 2 indicators to confidently flag as document
+  WHY: Single indicator could be car dashboard
+
+Lines 698-741: CASE B - LINED NOTEBOOK PAPER
+---------------------------------------------
+Line 704: edges_sensitive = cv2.Canny(img_gray, 30, 100)
+  WHY: Lower thresholds detect more subtle lines
+
+Line 707: cv2.HoughLinesP() - Detect straight lines
+  threshold=50: Minimum votes needed
+  minLineLength=100: Ignore short lines
+  maxLineGap=10: Connect nearby line segments
+
+Lines 713-720: COUNT HORIZONTAL LINES
+  angle < 5 or angle > 175: Nearly horizontal
+  Track vertical positions (y1)
+
+Lines 726-741: NOTEBOOK PATTERN CHECK
+  >= 15 lines: Likely notebook paper
+  Check spacing variance:
+    - Low variance = consistent spacing (notebook)
+    - High variance = irregular spacing (road markings)
+
+Lines 744-752: CASE C - ASPECT RATIO CHECK
+-------------------------------------------
+Square-ish (0.7 < ratio < 1.4) + bright + edges = document
+np.percentile(img_gray, 10) > 80: Even darkest parts are bright
+
+================================================================================
+SECTION 10: ROAD DETECTION - ML MODEL (Lines 757-944)
+================================================================================
+
+Lines 760-775: INITIALIZE VARIABLES
+------------------------------------
+WHY: Declare all variables upfront to avoid scope issues
+
+Lines 777-789: RUN ENHANCED ROAD DETECTOR
+------------------------------------------
+Line 778: Check not is_document (skip if already flagged)
+Line 781: enhanced_road_detector.detect_roads_enhanced()
+  confidence_threshold=0.15: Low threshold to catch all detections
+  WHY: We apply stricter threshold (0.50) later after validation
+
+Lines 783-789: CHECK HIGH CONFIDENCE
+  max_conf > 0.50: Only proceed if at least one detection is confident
+
+Lines 791-860: VALIDATE ROAD DETECTION
+---------------------------------------
+Lines 808-813: CHECK VEGETATION
+  Green in HSV color space
+  green_percentage > 60 AND no linear features = reject
+  WHY: Pure vegetation is not a road
+
+Lines 825-830: CHECK UNIFORMITY
+  top_5_sum > 0.35: Too uniform (diagram/synthetic)
+  
+Lines 844-846: CHECK TEXTURE
+  laplacian_var < 50: Too flat (not real road surface)
+
+Lines 849-853: ACCEPT
+  Passed all validation checks
+  is_road_image = True
+
+Lines 862-935: PARAMETER VALIDATION LAYER
+------------------------------------------
+WHY: Activate when ML model confidence too low OR model unavailable
+
+Lines 867-876: EDGE DENSITY CHECK
+  edge_density > 0.35: Typical of text/screenshots
+  WHY: Roads have moderate edge density, not excessive
+
+Lines 878-914: ROAD SCORE CALCULATION
+  Start at 0, add points for road features
+  Line 897-900: NUCLEAR PENALTIES
+    top_5_sum > 0.35: -500 (synthetic)
+    laplacian_var < 50: -500 (flat)
+  Lines 902-914: ADD POINTS
+    Horizontal lines: +30
+    Road-like brightness: +25
+    Road-like texture: +20
+    Textured bottom third: +25
+
+Line 916: THRESHOLD
+  road_score >= 50: Accept as road
+  WHY: Learned from validation set
+
+Lines 920-935: ADVANCED CLASSIFIER
+  If score negative: Reject (synthetic/document)
+  If score 0-49: Try AdvancedRoadClassifier
+    Uses additional feature thresholds
+
+================================================================================
+SECTION 11: ABUSE DETECTION - ENSEMBLE (Lines 1047-1133)
+================================================================================
+
+Lines 1052-1065: SKIP LOGIC
+----------------------------
+WHY: Documents trigger false positives (high edge density)
+If is_document: Skip abuse detection entirely
+
+Lines 1067-1098: RUN ENSEMBLE
+------------------------------
+Line 1070: detect_abuse_weighted_ensemble()
+Lines 1084-1092: CLASS-SPECIFIC THRESHOLDS
+  weapon/gun/knife: 0.50
+  violence/blood: 0.65
+  abusive: 0.65
+
+Lines 1100-1126: FALSE POSITIVE FILTERING
+------------------------------------------
+Lines 1105-1107: CHECK SKIN TONE
+  20-40% skin + normal brightness = normal photo
+
+Lines 1116-1118: CHECK WEAPON FLAGS
+  has_weapon_flag: Any detection contains "weapon" or "gun"
+
+Lines 1120-1126: DECISION
+  If normal photo AND no weapons AND low confidence (<0.65):
+    Filter out (likely false positive)
+
+This completes the first half. The file continues with parameter-based weapon detection,
+text abuse detection, garbage classification, final decision logic, strike system, and
+Flask routes. Would you like me to continue with the remaining sections?
+
+================================================================================
+KEY CONCEPTS FOR VIVA DEFENSE
+================================================================================
+
+1. ENSEMBLE LEARNING
+   - Multiple models voting together
+   - Reduces individual model errors
+   - Weighted voting based on confidence
+
+2. ADAPTIVE THRESHOLDING
+   - Different thresholds for different classes
+   - Learned from validation data
+   - Balances precision and recall
+
+3. MULTI-LAYER VALIDATION
+   - Layer 1: ML models (YOLO)
+   - Layer 2: Parameter validation (CV algorithms)
+   - Layer 3: Context-aware filtering
+   - WHY: Catch edge cases, reduce false positives
+
+4. PRIVACY-FIRST DESIGN
+   - Human detection runs first
+   - Realism checks (icons vs real people)
+   - Size filtering (ignore tiny detections)
+
+5. GRACEFUL DEGRADATION
+   - System works even if models fail to load
+   - Falls back to parameter-based detection
+   - Fail-open for technical errors (don't block users)
+
+6. PERFORMANCE OPTIMIZATION
+   - Text-only fast path (skip image models)
+   - Early rejection (documents, privacy)
+   - Conditional model execution
+
+7. GOVERNMENT-GRADE STRICTNESS
+   - Strike system for violations
+   - Multiple validation layers
+   - Detailed logging for auditing
+
+================================================================================
+COMMON VIVA QUESTIONS & ANSWERS
+================================================================================
+
+Q: Why use 6 models instead of 1?
+A: Ensemble learning reduces errors. Each model trained on different data subsets,
+   catches different abuse patterns. Voting consensus more reliable than single model.
+
+Q: Why different thresholds for different classes?
+A: Weapons are critical threats (lower threshold to catch all).
+   Blood has many false positives from red objects (higher threshold).
+   Learned optimal thresholds from validation set.
+
+Q: How do you handle false positives?
+A: Multi-layer validation:
+   1. Realism checks (texture, color complexity)
+   2. Context-aware filtering (car interior, normal photos)
+   3. Confidence-based filtering (weak detections in safe contexts)
+
+Q: Why check for documents separately?
+A: Documents have high edge density, trigger false positives in abuse detection.
+   Pre-filtering saves GPU time and improves accuracy.
+
+Q: What if models fail to load?
+A: Graceful degradation - fall back to parameter-based detection using
+   OpenCV algorithms (edge detection, texture analysis, color analysis).
+
+Q: How do you protect privacy?
+A: Detect humans using YOLO, reject images with people.
+   Realism checks distinguish real people from icons.
+   Size filtering ignores tiny/distant people.
+
+Q: Why adaptive weighting in ensemble?
+A: High-confidence predictions more reliable, deserve more influence.
+   Formula: 0.70 + (0.05 * confidence) - 0.025
+   Ranges from 67.5% to 72.5% weight for main model.
+
+Q: How do you handle text-only submissions?
+A: Fast path - skip all image models, only run text analysis.
+   Saves ~300ms processing time and GPU resources.
+
+================================================================================
+END OF EXPLANATION
+================================================================================
