@@ -1375,7 +1375,8 @@ def home():
 </head>
 <body>
     <div class="container">
-        <h1>🗑️ Garbage Reporting System</h1>
+        <h1>VOICE UP</h1>
+        <h2 style="color: #7f8c8d; text-align: center; margin-top: -20px; margin-bottom: 30px; font-size: 1.2em;">Relevance and Abuse Content Filteration - Garbage Sector</h2>
         
         <div class="upload-section">
             <input type="file" id="imageInput" accept="image/*" style="display: none;">
