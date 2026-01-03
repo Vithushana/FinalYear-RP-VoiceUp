@@ -57,9 +57,9 @@ Your Main Contributions:
    - Accuracy: 94.2%
 
 2. Abuse Detection System (6-model ensemble)
-   - Detects weapons, violence, blood, abusive content
+   - Detects weapons, violence, blood, abusive content, default
    - Multi-model weighted voting for high accuracy
-   - Precision: 91.8%
+   - Precision: 76.8%
 
 3. Privacy Protection System (Human Detection)
    - Detects people in images to protect privacy
@@ -74,7 +74,7 @@ Your Main Contributions:
 5. Garbage Classification (Bonus Feature)
    - Detects if roads have visible garbage/waste
    - Helps categorize road cleanliness
-   - Accuracy: 100%
+   - Accuracy: 92.8%
 
 Your Files:
 -----------

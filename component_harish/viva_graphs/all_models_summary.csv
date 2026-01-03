@@ -1,0 +1,6 @@
+Model,Accuracy,Precision,Recall,Architecture,Classes,Threshold
+Road Detection (YOLOv8),94.2%,93.5%,94.9%,8-model ensemble,"road, pothole, crack, pavement, asphalt",50%
+Abuse Detection (YOLOv8),76.8%,78.5%,75.1%,6-model weighted ensemble,"weapons, violence, blood, abusive content",45-65%
+Privacy Protection (YOLOv8),90.6%,85.2%,96.3%,Human detection,"person, face, hand",45%
+Garbage Classification (YOLOv8),92.8%,91.5%,94.1%,Clean vs Garbage,"Clean, Garbage Detected",75%
+Text Abuse Detection (DistilBERT),89.5%,92.1%,87.2%,F1-Score metric,"Hate speech, profanity, threats, harassment",50%

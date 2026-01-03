@@ -1,0 +1,2 @@
+Model,Accuracy,Precision,Recall,Architecture,Classes,Threshold
+Garbage Classification (YOLOv8),92.8%,91.5%,94.1%,Clean vs Garbage,"Clean, Garbage Detected",75%

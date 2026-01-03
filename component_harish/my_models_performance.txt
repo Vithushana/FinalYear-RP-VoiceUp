@@ -25,7 +25,7 @@ Loading models and calculating metrics...
       - mAP50: 0.7680 (76.80%)
       - Precision: 0.7850 (78.50%)
       - Recall: 0.7510 (75.10%)
-      - Detected Classes: weapons, violence, blood, abusive content
+      - Detected Classes: weapons, violence, blood, abusive content, default
       - Thresholds: Weapons 45%, Violence 60%, Blood 65%, Abusive 55%, Default 50%
 
 

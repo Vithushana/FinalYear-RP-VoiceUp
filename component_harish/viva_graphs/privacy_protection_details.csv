@@ -1,0 +1,2 @@
+Model,Accuracy,Precision,Recall,Architecture,Classes,Threshold
+Privacy Protection (YOLOv8),90.6%,85.2%,96.3%,Human detection,"person, face, hand",45%

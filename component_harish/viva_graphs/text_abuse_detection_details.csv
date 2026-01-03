@@ -1,0 +1,2 @@
+Model,Accuracy,Precision,Recall,Architecture,Classes,Threshold
+Text Abuse Detection (DistilBERT),89.5%,92.1%,87.2%,F1-Score metric,"Hate speech, profanity, threats, harassment",50%
