@@ -35,12 +35,12 @@ echo [3/3] Starting Flutter Web Application...
 echo.
 echo ========================================
 echo Web app will open in Chrome browser
-echo Access URL: http://localhost:8080
+echo Access URL: http://localhost:3001
 echo Press Ctrl+C to stop the server
 echo ========================================
 echo.
 
 REM Run Flutter web on port 8080
-call flutter run -d chrome --web-port=8080
+call flutter run -d chrome --web-port=3001
 
 pause
