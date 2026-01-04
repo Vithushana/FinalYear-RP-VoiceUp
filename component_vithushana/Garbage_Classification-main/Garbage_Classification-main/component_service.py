@@ -7,13 +7,16 @@ This service provides TWO different features based on issue type:
    - Detects if image is AI-generated or real photo
    - Runs during validation (before submit)
    
-2. For GARBAGE issues: Garbage Type Classification (Port 5003)
+2. For GARBAGE issues: Garbage Type Classification + Detailed Detection
    - Classifies garbage type (plastic, organic, metal, etc.)
+   - Calls detailed garbage identification service (Port 5003)
+   - Shows ALL detected garbage types in terminal
    - Runs IMMEDIATELY when user selects image (auto-fills field)
 
 Architecture:
 - AI Detection Service: http://localhost:5002/analyze
-- Garbage Classification Service: http://localhost:5003/classify
+- Garbage Classification Service: http://localhost:5002/classify
+- Detailed Garbage Identification: http://localhost:5003/predict (terminal output)
 """
 
 from flask import Flask, request, jsonify
@@ -26,6 +29,7 @@ import io
 import base64
 import os
 import sys
+import requests
 
 # Component directory
 COMPONENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -223,6 +227,55 @@ def predict_garbage_from_base64(image_data):
         raise Exception(f"Garbage classification error: {str(e)}")
 
 
+# ============= NEW: Detailed Garbage Identification Function =============
+def detect_garbage_types_terminal(image_data: str):
+    """
+    Call the detailed garbage identification service (port 5003)
+    Shows ALL detected garbage types in terminal
+    """
+    try:
+        print(f"\n{'='*50}")
+        print(f"🗑️ DETAILED GARBAGE TYPE DETECTION")
+        print(f"{'='*50}")
+        print(f"📡 Calling Garbage Identification Service (Port 5003)...")
+        
+        response = requests.post(
+            'http://localhost:5003/predict',
+            json={'image': image_data},
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            detections = result.get('detections', [])
+            best_prediction = result.get('best_prediction')
+            
+            print(f"✅ Garbage detection completed!")
+            print(f"📊 Found {len(detections)} garbage items:")
+            
+            if detections:
+                for i, detection in enumerate(detections, 1):
+                    class_name = detection.get('class_name', 'Unknown')
+                    confidence = detection.get('confidence', 0)
+                    print(f"   {i}. {class_name} (Confidence: {confidence:.2f})")
+                
+                if best_prediction:
+                    best_name = best_prediction.get('class_name', 'Unknown')
+                    best_conf = best_prediction.get('confidence', 0)
+                    print(f"\n🎯 BEST MATCH: {best_name} (Confidence: {best_conf:.2f})")
+            else:
+                print(f"   No garbage detected in image")
+                
+        else:
+            print(f"❌ Garbage detection service error: {response.status_code}")
+            
+        print(f"{'='*50}\n")
+        
+    except Exception as e:
+        print(f"❌ Error calling garbage detection: {e}")
+        print(f"{'='*50}\n")
+
+
 # Load both models on startup
 load_ai_model()
 load_garbage_model()
@@ -238,7 +291,7 @@ def health_check():
         'component': 'Component 2 - Dual Service',
         'ai_detection_loaded': AI_MODEL_LOADED,
         'garbage_classification_loaded': GARBAGE_MODEL_LOADED,
-        'version': '2.0'
+        'version': '2.1'
     })
 
 
@@ -325,6 +378,8 @@ def classify_garbage():
     This endpoint is called IMMEDIATELY when user selects image
     Returns garbage type to auto-fill the field
     Only for issue_type == 'garbage'
+    
+    NEW: Also calls detailed garbage detection (Port 5003) for terminal output
     """
     try:
         if not GARBAGE_MODEL_LOADED:
@@ -345,6 +400,10 @@ def classify_garbage():
         label, confidence, is_confident = predict_garbage_from_base64(image_data)
         
         print(f"   Result: {label} ({confidence:.2%}) - {'Confident' if is_confident else 'Uncertain'}")
+        
+        # NEW: Call detailed garbage detection for terminal output
+        print(f"   📡 Calling detailed garbage identification...")
+        detect_garbage_types_terminal(image_data)
         
         # Return classification result
         result = {
@@ -379,6 +438,10 @@ if __name__ == '__main__':
     print(f"  - GET  /health          (Health check)")
     print(f"  - POST /analyze         (AI vs Real - for ROAD issues)")
     print(f"  - POST /classify        (Garbage Type - for GARBAGE issues)")
+    print(f"")
+    print(f"Integration:")
+    print(f"  - Detailed Garbage Detection: http://localhost:5003/predict")
+    print(f"  - Terminal Output: All garbage types detected")
     print(f"")
     print(f"Models:")
     print(f"  - AI Detection: {'✅ Loaded' if AI_MODEL_LOADED else '❌ Not Loaded'}")
