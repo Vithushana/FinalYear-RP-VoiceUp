@@ -15,6 +15,7 @@ Architecture:
 - Component 2 (Dual Service): http://localhost:5002
   - /analyze - AI vs Real (for ROAD issues only)
   - /classify - Garbage Type (called separately during image selection for GARBAGE)
+- Component 3 (Garbage Identification): http://localhost:5003 - Terminal-only detailed detection
 - Main application backend: http://localhost:5000
 """
 
@@ -26,6 +27,7 @@ import concurrent.futures
 COMPONENT_1_URL = os.getenv('COMPONENT_1_URL', 'http://localhost:5001/analyze')
 COMPONENT_2_AI_URL = os.getenv('COMPONENT_2_AI_URL', 'http://localhost:5002/analyze')
 COMPONENT_2_GARBAGE_URL = os.getenv('COMPONENT_2_GARBAGE_URL', 'http://localhost:5002/classify')
+COMPONENT_3_GARBAGE_IDENTIFY_URL = os.getenv('COMPONENT_3_GARBAGE_IDENTIFY_URL', 'http://localhost:5003/predict')
 COMPONENT_TIMEOUT = 60  # seconds
 
 
@@ -95,6 +97,62 @@ def call_component_service(url, image_data, description, issue_type, component_n
         }
 
 
+def detect_garbage_types_terminal(image_data: str):
+    """
+    Detect detailed garbage types and show results in terminal only
+    Called for GARBAGE issues when issue_type is 'garbage'
+    
+    Args:
+        image_data: Base64 encoded image
+        
+    Returns:
+        None (results printed to terminal only)
+    """
+    try:
+        payload = {'image': image_data}
+        
+        print(f"\n{'='*50}")
+        print(f"🗑️ DETAILED GARBAGE TYPE DETECTION")
+        print(f"{'='*50}")
+        print(f"📡 Calling Garbage Identification Service...")
+        
+        response = requests.post(
+            COMPONENT_3_GARBAGE_IDENTIFY_URL,
+            json=payload,
+            timeout=COMPONENT_TIMEOUT
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            detections = result.get('detections', [])
+            best_prediction = result.get('best_prediction')
+            
+            print(f"✅ Garbage detection completed!")
+            print(f"📊 Found {len(detections)} garbage items:")
+            
+            if detections:
+                for i, detection in enumerate(detections, 1):
+                    class_name = detection.get('class_name', 'Unknown')
+                    confidence = detection.get('confidence', 0)
+                    print(f"   {i}. {class_name} (Confidence: {confidence:.2f})")
+                
+                if best_prediction:
+                    best_name = best_prediction.get('class_name', 'Unknown')
+                    best_conf = best_prediction.get('confidence', 0)
+                    print(f"\n🎯 BEST MATCH: {best_name} (Confidence: {best_conf:.2f})")
+            else:
+                print(f"   No garbage detected in image")
+                
+        else:
+            print(f"❌ Garbage detection service error: {response.status_code}")
+            
+        print(f"{'='*50}\n")
+        
+    except Exception as e:
+        print(f"❌ Error calling garbage detection: {e}")
+        print(f"{'='*50}\n")
+
+
 def validate_post_content(image_data: str, description: str, issue_type: str):
     """
     Validate post content by calling multiple components in PARALLEL
@@ -111,8 +169,8 @@ def validate_post_content(image_data: str, description: str, issue_type: str):
     FOR GARBAGE ISSUES:
     1. Component 2 (Garbage Classification) already ran during image selection
        (auto-filled garbage_type field)
-    2. Only Component 1 (Harish) runs validation: Privacy, Abuse, Text
-    3. No AI detection for garbage (not needed)
+    2. Component 1 (Harish) runs validation: Privacy, Abuse, Text
+    3. Component 3 (Garbage Identification) runs in parallel for terminal display
     4. If Component 1 REJECTS → Show Component 1 reasons
     5. If Component 1 PASSES → APPROVED
     
@@ -194,16 +252,26 @@ def validate_post_content(image_data: str, description: str, issue_type: str):
             return component_1_result
     
     else:
-        # GARBAGE ISSUE: Only run Component 1 (garbage classification already done)
-        print(f"🗑️ GARBAGE Issue: Running Component 1 only (garbage type already classified)")
+        # GARBAGE ISSUE: Run Component 1 + Terminal Garbage Detection in parallel
+        print(f"🗑️ GARBAGE Issue: Running Component 1 + Terminal Garbage Detection in parallel")
         
-        component_1_result = call_component_service(
-            COMPONENT_1_URL,
-            image_data,
-            description,
-            issue_type,
-            "Component 1 (Harish)"
-        )
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            future_component_1 = executor.submit(
+                call_component_service,
+                COMPONENT_1_URL,
+                image_data,
+                description,
+                issue_type,
+                "Component 1 (Harish)"
+            )
+            
+            future_garbage_detect = executor.submit(
+                detect_garbage_types_terminal,
+                image_data
+            )
+            
+            component_1_result = future_component_1.result()
+            future_garbage_detect.result()  # Just for terminal output
         
         print(f"\n{'='*60}")
         print(f"✅ VALIDATION COMPLETE")
@@ -275,4 +343,3 @@ def create_error_response(title, reason):
             'type': 'error'
         }
     }
-
