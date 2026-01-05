@@ -836,9 +836,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               Container(
                 constraints: const BoxConstraints(maxHeight: 400),
                 child: Image.memory(
-                  imageBytes,
-                  fit: BoxFit.contain,
-                ),
+                   imageBytes,
+                   fit: BoxFit.contain,  
+                 ),
               ),
               
               const SizedBox(height: 16),
@@ -913,7 +913,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       child: _images.isNotEmpty
                           ? Image.memory(
                               _getImageBytes(_images[0]),
-                              fit: BoxFit.cover,
+                              fit: BoxFit.contain,  
                             )
                           : const Icon(Icons.image, size: 40, color: Colors.grey),
                     ),
@@ -1303,7 +1303,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         color: Colors.grey[300],
         child: Image.memory(
           _getImageBytes(base64Image),
-          fit: BoxFit.cover,
+          fit: BoxFit.contain,  
         ),
       ),
     );
