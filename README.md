@@ -1,6 +1,6 @@
-# VoiceUp - AI-Powered Road Issue Reporting Platform
+# VoiceUp - AI-Powered Local Issue Reporting Platform
 
-**VoiceUp** is an intelligent road issue reporting platform that empowers citizens to report road problems (potholes, cracks, debris) while ensuring content quality through AI-powered moderation. The system uses advanced machine learning models to validate submissions, detect abuse, and protect user privacy.
+**VoiceUp** is an intelligent local issue reporting platform that empowers citizens to report community problems across multiple sectors while ensuring content quality through AI-powered moderation. The system uses advanced machine learning models to validate submissions, detect abuse, and protect user privacy. Currently supporting **Road Issues** and **Garbage Management** sectors with plans to expand to all community service areas.
 
 ---
 
@@ -24,12 +24,13 @@
 ## ✨ Features
 
 ### **For Users**
-- 📸 **Easy Reporting**: Capture or upload road issue photos with descriptions
+- 📸 **Easy Reporting**: Capture or upload issue photos with descriptions
 - 📍 **Location Tracking**: Automatic location detection (GPS-based)
 - 🔍 **Issue Tracking**: View submitted complaints and their status
 - ⭐ **Favorites**: Save frequently reported locations
 - 🔔 **Notifications**: Get updates on complaint status
 - 🌐 **Multi-Platform**: Works on Android, iOS, and Web
+- 🗑️ **Multi-Sector Support**: Report Road Issues and Garbage problems
 
 ### **For Administrators**
 - 🤖 **AI Content Moderation**: Automatic abuse and privacy detection
@@ -37,14 +38,16 @@
 - 📊 **Analytics Dashboard**: Track complaint statistics
 - ⚖️ **Strike System**: Manage user violations
 - 🗺️ **Geographic Insights**: Heat maps of reported issues
+- 📋 **Sector Management**: Handle multiple community service areas
 
 ### **AI-Powered Features**
-- **Road Relevance Detection**: 8-model ensemble validates road images
-- **Abuse Detection**: 6-model weighted ensemble detects inappropriate content
-- **Text Moderation**: DistilBERT transformer for text abuse detection
+- **Road Relevance Detection**: YOLOv8 model validates road images (94.2% accuracy)
+- **Garbage Relevance Detection**: YOLOv8 model validates garbage issues (92.8% accuracy)
+- **Abuse Detection**: YOLOv8 model detects inappropriate content (76.8% accuracy)
+- **Text Moderation**: DistilBERT transformer for text abuse detection (89.5% F1-Score)
 - **Privacy Protection**: Human detection with 90.6% mAP50 accuracy
 - **AI vs Real Detection**: ResNet-50 model distinguishes AI-generated from real photos
-- **Garbage Classification**: MobileNetV2 model for automatic garbage type detection
+- **Strike Management**: Progressive warning system for violations
 
 ---
 
@@ -68,8 +71,15 @@
         ▼                         ▼
 ┌──────────────────┐    ┌──────────────────────┐
 │  AI Validation   │    │   Database Layer     │
-│  Service         │    │   (SQLite/MySQL)     │
-│  (YOLOv8 Models) │    │                      │
+│  Services        │    │   (SQLite/MySQL)     │
+│                  │    │                      │
+│  Component 1     │    │                      │
+│  - Harishram.M   │    │                      │
+│  (Port 5001)     │    │                      │
+│                  │    │                      │
+│  Component 2     │    │                      │
+│  - Vithushana    │    │                      │
+│  (Port 5002)     │    │                      │
 └──────────────────┘    └──────────────────────┘
 ```
 
@@ -149,22 +159,31 @@ numpy==1.24.3
 ultralytics==8.0.120
 torch==2.0.1
 torchvision==0.15.2
-transformers==4.30.0
-pillow==10.0.0
-python-dotenv==1.0.0
+transformers==4.31.0
+pillow==10.1.0
+python-dotenv==1.0.1
 ```
 
 #### **3.3 Verify Model Files**
 
 Ensure these model files exist:
 ```
-component_harish/
+component_harish/ (Harishram.M - Port 5001)
 ├── models/
 │   ├── abuse_detection_final/abuse_detection_best.pt
 │   ├── human_detection_final/human_detection_best.pt
-│   └── text_abuse_model/ (DistilBERT)
-├── abuse_detection_23456/ (5 specialist models)
-└── garbage-results/best.pt
+│   ├── garbage_classification_model/best.pt
+│   ├── road_detection_model/road_detection_best.pt
+│   └── text_abuse_model/ (DistilBERT files)
+├── trained_models_config.txt
+└── abuse_detection_23456/ (5 specialist models)
+
+component_vithushana/ (Vithushana - Port 5002)
+├── voiceup-ai-or-real-image-classification-main/
+│   └── models/
+│       └── resnet50_ai_vs_real.pth
+└── Garbage_Classification-main/
+    └── garbage_model.pth
 ```
 
 ### **Step 4: Setup Flutter App**
@@ -250,12 +269,13 @@ start_all_validation_services.bat
 
 This starts:
 - Flask backend (Port 5000)
-- AI validation service
+- Component 1 - AI validation service (Harishram.M - Port 5001)
+- Component 2 - AI detection service (Vithushana - Port 5002)
 - Database server
 
 ### **Option 2: Run Components Separately**
 
-#### **Backend Only:**
+#### **Component 1 - Relevance and Abuse Filtration (Harishram.M):**
 ```bash
 cd component_harish
 python working_demo.py
@@ -303,7 +323,7 @@ flutter build apk --release
 2. Tap "Login"
 3. Access granted to main dashboard
 
-### **2. Reporting Road Issues**
+### **2. Reporting Local Issues**
 
 #### **Step-by-Step Process:**
 
@@ -311,23 +331,27 @@ flutter build apk --release
    - Tap "+" button on bottom navigation
    - Or select "Make Complaint" from menu
 
-2. **Capture/Upload Image**
+2. **Select Issue Type**
+   - **Road Issues**: Potholes, cracks, road damage
+   - **Garbage Issues**: Waste accumulation, illegal dumping
+
+3. **Capture/Upload Image**
    - Tap camera icon to take photo
    - Or tap gallery icon to select existing image
-   - **Important**: Image must show actual road issue
+   - **Important**: Image must show actual issue
 
-3. **Add Location**
+4. **Add Location**
    - Tap "Get Location" button
    - Allow location permissions
    - Verify location is correct
    - Or manually enter address
 
-4. **Write Description**
+5. **Write Description**
    - Describe the issue clearly
    - Example: "Large pothole on Main Street near traffic light"
    - **Avoid**: Abusive language, personal information
 
-5. **Submit Complaint**
+6. **Submit Complaint**
    - Review all details
    - Tap "Submit Complaint"
    - Wait for AI validation (5-10 seconds)
@@ -336,8 +360,9 @@ flutter build apk --release
 
 Your submission goes through multiple checks:
 
-✅ **Road Relevance Check**
-- Validates image shows actual road/pavement
+✅ **Relevance Check**
+- Road Issues: Validates image shows actual road/pavement
+- Garbage Issues: Validates image shows garbage/waste
 - Rejects: Documents, screenshots, unrelated images
 
 ✅ **Privacy Protection**
@@ -407,11 +432,12 @@ Strikes are penalties for violating content policies.
 ### **6. Best Practices**
 
 #### **✅ DO:**
-- Take clear, well-lit photos of road issues
+- Take clear, well-lit photos of issues
 - Include specific location details
 - Describe issue accurately
 - Report genuine problems
 - Respect privacy (no people in photos)
+- Choose appropriate issue type (Road/Garbage)
 
 #### **❌ DON'T:**
 - Upload screenshots or documents
@@ -419,19 +445,19 @@ Strikes are penalties for violating content policies.
 - Use abusive language
 - Submit fake/joke reports
 - Spam multiple reports
+- Report road issues as garbage (or vice versa)
 
 ---
 
 ## 🤖 AI Models
 
-### **1. Road Detection System**
+### **1. Road Relevance Detection System (Harishram.M - IT22132178)**
 
-**Architecture**: 8-model ensemble
+**Architecture**: YOLOv8 Road Detection Model
 **Accuracy**: 94.2% on validation set
-**Models**:
-- 8 YOLOv8 models trained on different road datasets
-- Voting consensus for final decision
-- Confidence threshold: 50%
+**Model**: Single YOLOv8 model trained on road dataset
+**Confidence threshold**: 50%
+**Component**: Relevance and Abuse Filtration (Port 5001)
 
 **What it detects**:
 - ✅ Potholes, cracks, road damage
@@ -440,42 +466,73 @@ Strikes are penalties for violating content policies.
 - ❌ Documents, screenshots
 - ❌ Indoor scenes, unrelated objects
 
-### **2. Abuse Detection System**
+### **2. Garbage Relevance Detection System (Harishram.M - IT22132178)**
 
-**Architecture**: 6-model weighted ensemble
-**Main Model**: 70% weight
-**Specialist Models**: 5 models @ 6% each (30% total)
+**Architecture**: YOLOv8 Garbage Classification Model
+**Accuracy**: 92.8% on validation set
+**Model**: Single YOLOv8 model trained on garbage dataset
+**Confidence threshold**: 75%
+**Component**: Relevance and Abuse Filtration (Port 5001)
+
+**What it detects**:
+- ✅ Garbage and waste on roads
+- ✅ Clean road surfaces
+- ✅ Environmental cleanliness
+- ❌ Non-road garbage scenarios
+
+### **3. Abuse Detection System (Harishram.M - IT22132178)**
+
+**Architecture**: YOLOv8 Abuse Detection Model
+**Accuracy**: 76.8% on validation set
+**Model**: Single YOLOv8 model trained on abuse dataset
+**Component**: Relevance and Abuse Filtration (Port 5001)
 
 **Detected Classes**:
 - Weapons (guns, knives)
 - Violence (fighting, blood)
+- Blood (gore, injuries)
+- Default (inappropriate default imagery)
 - Abusive content (explicit imagery)
 
 **Thresholds**:
 - Weapons: 45% confidence
 - Violence: 60% confidence
 - Blood: 65% confidence
+- Default: 50% confidence
+- Abusive content: 55% confidence
 
-### **3. Privacy Protection**
+### **4. Privacy Protection (Harishram.M - IT22132178)**
 
 **Model**: YOLOv8 Human Detection
 **Accuracy**: 90.6% mAP50
+**Component**: Relevance and Abuse Filtration (Port 5001)
 **Features**:
 - Detects humans with 45% confidence threshold
 - Realism checks (distinguishes icons from real people)
 - Size filtering (ignores tiny/distant people)
 
-### **4. Text Abuse Detection**
+**Detected Classes**:
+- Person (full body detection)
+- Face (facial feature detection)
+
+### **5. Text Abuse Detection (Harishram.M - IT22132178)**
 
 **Model**: DistilBERT (fine-tuned)
 **Threshold**: 50% confidence
+**Component**: Relevance and Abuse Filtration (Port 5001)
 **Detects**:
 - Hate speech
 - Profanity
 - Threats
 - Harassment
 
-### **5. AI vs Real Image Detection** (Component 2 - Vithushana)
+**Detected Classes**:
+- SAFE (appropriate content)
+- ABUSE (profanity, hate speech)
+- SARCASM (context-based abuse)
+- POLITICAL (politically sensitive language)
+
+### **6. AI vs Real Image Detection** (Component 2 - Vithushana)
 
 **Model**: ResNet-50 (fine-tuned)
 **Port**: 5002
@@ -492,7 +549,7 @@ Strikes are penalties for violating content policies.
 - `ai`: AI-generated image (reject)
 - `real`: Real camera photo (accept)
 
-### **6. Garbage Type Classification** (Component 2 - Vithushana)
+### **7. Garbage Type Classification** (Component 2 - Vithushana)
 
 **Model**: MobileNetV2 (fine-tuned)
 **Port**: 5002
@@ -686,6 +743,34 @@ flutter run
 
 ---
 
+## 🔗 Repository Location
+
+### **GitHub Repository**
+- **Main Repository**: https://github.com/Vithushana/FinalYear-RP-VoiceUp
+- **Main Branch**: `main`
+- **Component Branches**: 
+  - `harish` - Relevance and Abuse Filtration (Harishram.M)
+  - `vithushana` - AI Detection & Garbage Classification (Vithushana)
+- **Issues**: https://github.com/Vithushana/FinalYear-RP-VoiceUp/issues
+- **Component 1 (Harish)**: `/component_harish/`
+- **Component 2 (Vithushana)**: `/component_vithushana/`
+- **Flutter App**: `/application/`
+- **Website**: `/website/`
+
+### **Local Folder Path**
+- **Windows**: `c:\Users\Admin pc\Desktop\FinalYear-RP-VoiceUp\`
+- **Main README**: `c:\Users\Admin pc\Desktop\FinalYear-RP-VoiceUp\README.md`
+- **Component 1 README**: `c:\Users\Admin pc\Desktop\FinalYear-RP-VoiceUp\component_harish\README.md`
+
+### **Branch Information**
+- **Main Branch**: Complete VoiceUp platform with all components
+- **Harish Branch**: Relevance and Abuse Filtration component updates
+- **Switch to Harish Branch**: `git checkout harish`
+- **View All Branches**: `git branch -a`
+- **Clone Specific Branch**: `git clone -b harish https://github.com/Vithushana/FinalYear-RP-VoiceUp.git`
+
+---
+
 ## 📁 Project Structure
 
 ```
@@ -732,14 +817,17 @@ FinalYear-RP-VoiceUp/
 
 ## 👥 Contributors
 
-- **Harish** - AI/ML Engineer
-  - Content Moderation System (Road detection, Abuse detection, Privacy protection, Text moderation)
-  - 8-model road detection ensemble
-  - 6-model abuse detection ensemble
-  - Human detection for privacy
-  - DistilBERT text abuse detection
+- **Harishram.M** - (IT22132178)
+  - Relevance and Abuse Filtration System (Port 5001)
+  - Road Relevance Detection (YOLOv8 - 94.2% accuracy)
+  - Garbage Relevance Detection (YOLOv8 - 92.8% accuracy)
+  - Abuse Detection System (YOLOv8 - 76.8% accuracy)
+  - Privacy Protection (YOLOv8 Human Detection - 90.6% accuracy)
+  - Text Abuse Detection (DistilBERT - 89.5% F1-Score)
+  - Progressive Strike Management System
+  - Dual Notification System
   
-- **Vithushana** - Full Stack Developer & AI Engineer
+- **Vithushana** 
   - Flutter mobile/web application
   - Flask backend API
   - AI vs Real image detection (ResNet-50)
@@ -774,8 +862,9 @@ For issues or questions:
 ## 📊 Performance Metrics
 
 - **Road Detection Accuracy**: 94.2%
-- **Abuse Detection Precision**: 91.8%
-- **Privacy Protection Recall**: 96.3%
+- **Garbage Detection Accuracy**: 92.8%
+- **Abuse Detection Accuracy**: 76.8%
+- **Privacy Protection Accuracy**: 90.6%
 - **Text Moderation F1-Score**: 89.5%
 - **Average Processing Time**: 2.3 seconds per submission
 - **System Uptime**: 99.7%
@@ -786,11 +875,14 @@ For issues or questions:
 
 ### **v1.0.0** (Current)
 - ✅ Multi-platform support (Android, iOS, Web)
-- ✅ 8-model road detection ensemble
-- ✅ 6-model abuse detection system
-- ✅ Privacy protection with human detection
-- ✅ Text abuse detection with DistilBERT
-- ✅ Strike system for violations
+- ✅ 5-model AI validation system (Harishram.M)
+- ✅ Road Relevance Detection (94.2% accuracy)
+- ✅ Garbage Relevance Detection (92.8% accuracy)
+- ✅ Abuse Detection (76.8% accuracy)
+- ✅ Privacy Protection (90.6% accuracy)
+- ✅ Text Abuse Detection (89.5% F1-Score)
+- ✅ Progressive Strike Management System
+- ✅ Dual Notification System
 - ✅ Real-time location tracking
 - ✅ Favorites feature
 
