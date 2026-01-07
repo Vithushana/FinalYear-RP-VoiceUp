@@ -1458,49 +1458,277 @@ def home():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Garbage Reporting - AI System</title>
+    <title>VoiceUp - Garbage Issue AI Validation</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
-        .container { background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; }
-        .upload-section { border: 2px dashed #3498db; padding: 40px; text-align: center; border-radius: 10px; margin-bottom: 20px; transition: all 0.3s ease; }
-        .upload-section:hover { background-color: #ecf0f1; border-color: #2980b9; }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; color: #34495e; }
-        textarea { width: 100%; padding: 10px; border: 1px solid #bdc3c7; border-radius: 5px; min-height: 100px; font-family: inherit; }
-        button { background-color: #2ecc71; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; transition: background-color 0.3s; }
-        button:hover { background-color: #27ae60; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            max-width: 900px;
+            margin: 0 auto 30px auto;
+            text-align: center;
+            padding: 30px 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+        .logo-text {
+            font-size: 3em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 3px;
+        }
+        .subtitle {
+            color: #5a6c7d;
+            font-size: 1.1em;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+        .sector-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-size: 0.9em;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+        .container { 
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+        .container h2 {
+            text-align: center;
+        }
+        .upload-section { 
+            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+            border: 3px dashed #11998e;
+            padding: 50px;
+            text-align: center;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .upload-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(17, 153, 142, 0.1), transparent);
+            transform: rotate(45deg);
+            transition: all 0.6s ease;
+        }
+        .upload-section:hover::before {
+            left: 100%;
+        }
+        .upload-section:hover { 
+            border-color: #38ef7d;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(17, 153, 142, 0.3);
+        }
+        .upload-btn {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            box-shadow: 0 5px 15px rgba(17, 153, 142, 0.4);
+            position: relative;
+            z-index: 1;
+        }
+        .upload-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(17, 153, 142, 0.5);
+        }
+        .form-group { 
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        label { 
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 1.1em;
+            text-align: left;
+        }
+        textarea { 
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            min-height: 120px;
+            font-family: inherit;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            resize: vertical;
+            text-align: left;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #11998e;
+            box-shadow: 0 0 0 3px rgba(17, 153, 142, 0.1);
+        }
+        .analyze-btn { 
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            border: none;
+            padding: 18px 24px;
+            font-size: 1.2em;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            font-weight: 700;
+            box-shadow: 0 5px 15px rgba(72, 187, 120, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .analyze-btn:hover { 
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(72, 187, 120, 0.5);
+        }
         #result { margin-top: 30px; display: none; }
-        .result-card { border: 1px solid #ddd; padding: 20px; border-radius: 8px; margin-bottom: 15px; }
-        .status-accepted { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
-        .status-rejected { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
-        .metric { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .result-card { 
+            border: 2px solid #e2e8f0;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            animation: slideIn 0.5s ease;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .status-accepted { 
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 50%);
+            border-color: #48bb78;
+            color: #155724;
+        }
+        .status-rejected { 
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 50%);
+            border-color: #e53e3e;
+            color: #721c24;
+        }
+        .metric { 
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 10px;
+        }
         .metric:last-child { border-bottom: none; }
-        .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; display: none; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .preview-image { max-width: 100%; max-height: 300px; margin-top: 15px; border-radius: 5px; display: none; }
+        .loader { 
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #11998e;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 30px auto;
+            display: none;
+        }
+        @keyframes spin { 
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .preview-image { 
+            max-width: 100%;
+            max-height: 350px;
+            margin-top: 20px;
+            border-radius: 15px;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+            text-align: center;
+        }
+        .file-name {
+            color: #11998e;
+            font-weight: 600;
+            margin: 15px 0;
+            font-size: 1.1em;
+            text-align: center;
+        }
+        .result-card h2, .result-card h3 {
+            text-align: left;
+        }
+        .result-card p {
+            text-align: left
+        .file-name {
+            color: #11998e;
+            font-weight: 600;
+            margin: 15px 0;
+            font-size: 1.1em;
+        }
     </style>
 </head>
 <body>
+    <div class="header">
+        <div class="logo-container">
+            <div class="logo-icon">🎤</div>
+            <div class="logo-text">VOICE UP</div>
+        </div>
+        <div class="subtitle">AI-Powered Content Validation System</div>
+        <div class="sector-badge">🗑️ Waste Management Sector</div>
+    </div>
+    
     <div class="container">
-        <h1>VOICE UP</h1>
-        <h2 style="color: #7f8c8d; text-align: center; margin-top: -20px; margin-bottom: 30px; font-size: 1.2em;">Relevance and Abuse Content Filteration - Garbage Sector</h2>
+        <h2 style="color: #2d3748; text-align: center; margin-bottom: 30px; font-size: 1.8em;">Garbage Issue Reporting & Validation</h2>
         
         <div class="upload-section">
             <input type="file" id="imageInput" accept="image/*" style="display: none;">
-            <button onclick="document.getElementById('imageInput').click()" style="background-color: #3498db; width: auto; margin-bottom: 10px;">📸 Select Garbage Image</button>
-            <p id="fileName">No file selected</p>
+            <button onclick="document.getElementById('imageInput').click()" class="upload-btn">📸 Select Garbage Image</button>
+            <p class="file-name" id="fileName">No file selected</p>
             <img id="imagePreview" class="preview-image">
-            <p style="color: #7f8c8d; font-size: 0.9em; margin-top: 10px;">💡 For best results, provide both image and description for clarity</p>
+            <p class="info-text">💡 For best results, provide both image and description</p>
         </div>
 
         <div class="form-group">
-            <label for="description">Issue Description:</label>
-            <textarea id="description" placeholder="Describe the garbage issue (e.g., 'Illegal dumping site with plastic waste')..."></textarea>
-            <p style="color: #7f8c8d; font-size: 0.9em; margin-top: 5px;">⚠️ Please provide at least an image OR description</p>
+            <label for="description">📝 Issue Description:</label>
+            <textarea id="description" placeholder="Describe the garbage issue (e.g., 'Illegal dumping site with plastic waste and debris')..."></textarea>
+            <p class="info-text">⚠️ Please provide at least an image OR description</p>
         </div>
 
-        <button onclick="analyzeContent()">🔍 Analyze Content</button>
+        <button onclick="analyzeContent()" class="analyze-btn">🔍 Analyze Content</button>
         <div id="loader" class="loader"></div>
 
         <div id="result"></div>
