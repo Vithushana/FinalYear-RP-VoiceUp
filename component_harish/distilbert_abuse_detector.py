@@ -572,11 +572,11 @@ class AbuseDetectionPipeline:
     """
     
     def __init__(self, model_path: str = "models/text_abuse_model"):
-        print("🤖 Loading DistilBERT Abuse Detection Model...")
+        print("🤖 Loading DistilBERT model...")
         self.tokenizer = DistilBERTTokenizer(model_path)
         self.model = DistilBERTClassifier(model_path)
         self.using_fallback = False
-        print("✅ DistilBERT Pipeline Ready!")
+        print("✅ DistilBERT model loaded")
     
     def predict(self, text: str, threshold: float = 0.50) -> Tuple[bool, str, float]:
         """
