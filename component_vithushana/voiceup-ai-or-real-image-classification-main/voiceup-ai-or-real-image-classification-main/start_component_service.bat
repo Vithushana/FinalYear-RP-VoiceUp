@@ -1,14 +1,17 @@
 @echo off
-REM Quick Start Script for Component 2 Service
+REM Quick Start Script for Component 2 Service - OLD VERSION (DEPRECATED)
 REM ==========================================
 REM This script starts the AI vs Real Image Detection component
+REM NOTE: This is the OLD standalone service. Use run_component_2.py instead!
 
 echo.
 echo ============================================================
-echo   Starting Component 2 Service (AI vs Real Detection)
+echo   Starting Component 2 Service - OLD VERSION (DEPRECATED)
+echo   Port changed from 5002 to 5099 to avoid conflict
+echo   Please use run_component_2.py for the unified service!
 echo ============================================================
 echo.
-echo Port: 5002
+echo Port: 5099
 echo Endpoint: POST /analyze
 echo Health Check: GET /health
 echo.
