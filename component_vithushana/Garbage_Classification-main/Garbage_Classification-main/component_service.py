@@ -19,7 +19,7 @@ Architecture:
 - Detailed Garbage Identification: http://localhost:5003/predict (terminal output)
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import torch
 import torch.nn as nn
@@ -282,6 +282,11 @@ load_garbage_model()
 
 
 # ============= API Endpoints =============
+
+@app.route('/')
+def home():
+    """Demo page for testing the service"""
+    return render_template('index.html')
 
 @app.route('/health', methods=['GET'])
 def health_check():

@@ -316,11 +316,12 @@ def analyze():
 
 if __name__ == '__main__':
     print("\n" + "="*60)
-    print("🚀 STARTING COMPONENT 2 SERVICE")
+    print("🚀 STARTING COMPONENT 2 SERVICE - OLD VERSION (DEPRECATED)")
     print("="*60)
     print(f"Component: AI vs Real Image Classifier")
     print(f"Model: ResNet50")
-    print(f"Port: 5002")
+    print(f"Port: 5099 (Changed from 5002 to avoid conflict)")
+    print(f"Note: This is the OLD standalone service. Use run_component_2.py instead!")
     print(f"Endpoints:")
     print(f"  - GET  /health  (Health check)")
     print(f"  - POST /analyze (AI Detection)")
@@ -328,6 +329,6 @@ if __name__ == '__main__':
     
     app.run(
         host='0.0.0.0',
-        port=5002,
+        port=5099,
         debug=True
     )
