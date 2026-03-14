@@ -244,6 +244,7 @@ class ApiService {
         'simple_notification': validationResult['simple_notification'],
         'strike_warning': validationResult['strike_warning'],  // Pass strike warning
         'strike_notification': validationResult['strike_notification'],  // Pass strike notification
+        'morphed_image': validationResult['morphed_image'],  // Base64 morphed image (humans pixelated)
       };
     }
     

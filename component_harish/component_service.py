@@ -7,8 +7,8 @@ The main application backend (port 5000) calls this service via HTTP.
 This keeps the component completely isolated and makes it easy to:
 - Run/stop independently
 - Deploy separately
-- Integrate with other team members' components
-- Test in isolation
+- Integrate with other team members' components too
+- Test in isolation 
 """
 
 from flask import Flask, request, jsonify
