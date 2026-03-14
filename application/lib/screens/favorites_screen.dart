@@ -271,6 +271,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         _showFinalResultPopup(
           response['flutter_response'],
           strikeWarning: response['strike_warning'],
+          morphedImage: response['morphed_image'] as String?,
         );
         
         // Send dual notifications if strike was issued
@@ -387,6 +388,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   void _showFinalResultPopup(
     Map<String, dynamic> flutterResponse, {
     Map<String, dynamic>? strikeWarning,
+    String? morphedImage,
   }) {
     final title = flutterResponse['title'] ?? 'Content Check Result';
     final message = flutterResponse['message'] ?? '';
@@ -696,6 +698,31 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ),
         ),
         actions: [
+          if (morphedImage != null) ...[  
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _morphAndPost(morphedImage);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange[700],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 2,
+                ),
+                child: const Text(
+                  '🔒 Morph & Post',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -718,6 +745,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         ],
       ),
     );
+  }
+
+  void _morphAndPost(String morphedImage) {
+    // Replace the first image with the morphed version (humans pixelated for privacy)
+    if (_images.isNotEmpty) {
+      setState(() {
+        _images[0] = morphedImage;
+      });
+    }
+    _onPostPressed();
   }
 
   // Send dual notifications for strikes - Enhanced UX

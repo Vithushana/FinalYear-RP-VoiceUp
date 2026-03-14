@@ -232,6 +232,7 @@ def detect_garbage_types_terminal(image_data: str):
     """
     Call the detailed garbage identification service (port 5003)
     Shows ALL detected garbage types in terminal
+    Returns the best match label from Port 5003, or None if unavailable
     """
     try:
         print(f"\n{'='*50}")
@@ -263,6 +264,8 @@ def detect_garbage_types_terminal(image_data: str):
                     best_name = best_prediction.get('class_name', 'Unknown')
                     best_conf = best_prediction.get('confidence', 0)
                     print(f"\n🎯 BEST MATCH: {best_name} (Confidence: {best_conf:.2f})")
+                    print(f"{'='*50}\n")
+                    return best_name.lower(), best_conf
             else:
                 print(f"   No garbage detected in image")
                 
@@ -270,10 +273,12 @@ def detect_garbage_types_terminal(image_data: str):
             print(f"❌ Garbage detection service error: {response.status_code}")
             
         print(f"{'='*50}\n")
+        return None, None
         
     except Exception as e:
         print(f"❌ Error calling garbage detection: {e}")
         print(f"{'='*50}\n")
+        return None, None
 
 
 # Load both models on startup
@@ -406,19 +411,24 @@ def classify_garbage():
         
         print(f"   Result: {label} ({confidence:.2%}) - {'Confident' if is_confident else 'Uncertain'}")
         
-        # NEW: Call detailed garbage detection for terminal output
+        # Call detailed garbage detection (Port 5003) and use its result if available
         print(f"   📡 Calling detailed garbage identification...")
-        detect_garbage_types_terminal(image_data)
+        detailed_label, detailed_conf = detect_garbage_types_terminal(image_data)
+        
+        # Use Port 5003 result if available (higher accuracy YOLO model)
+        final_label = detailed_label if detailed_label else label
+        final_confidence = detailed_conf if detailed_conf else confidence
+        final_confident = final_confidence >= 0.55
         
         # Return classification result
         result = {
             'success': True,
-            'garbage_type': label,
-            'confidence': round(confidence, 4),
-            'confidence_percent': f"{confidence * 100:.2f}%",
-            'is_confident': is_confident,
+            'garbage_type': final_label,
+            'confidence': round(final_confidence, 4),
+            'confidence_percent': f"{final_confidence * 100:.2f}%",
+            'is_confident': final_confident,
             'all_classes': garbage_class_names,
-            'message': f"Detected: {label}" if is_confident else f"Uncertain: {label} (low confidence)"
+            'message': f"Detected: {final_label}" if final_confident else f"Uncertain: {final_label} (low confidence)"
         }
         
         return jsonify(result), 200
