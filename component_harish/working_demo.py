@@ -282,124 +282,6 @@ def morph_humans_in_image(image_np, boxes):
     return 'data:image/jpeg;base64,' + base64.b64encode(buf.tobytes()).decode('utf-8')
 
 
-def generate_annotated_image(img_color, human_boxes):
-    """
-    Draw colour-coded bounding boxes from all 4 YOLO models on the image.
-    Model colours:
-      RED    - Human / Privacy      (YOLOv8)
-      GREEN  - Road Detection       (YOLOv8 Ensemble x8)
-      ORANGE - Garbage Class.       (YOLOv8 trained 100% acc)
-      PURPLE - Abuse / Weapon       (YOLOv8 Ensemble)
-    DistilBERT (text) has no spatial boxes - shown in result panel only.
-    Returns base64 data-URL JPEG string.
-    """
-    try:
-        annotated = img_color.copy()
-        h_img, w_img = annotated.shape[:2]
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        fs = max(0.42, min(0.72, w_img / 1000.0))
-        thick = 2
-
-        C_HUMAN   = (0,   0, 230)    # RED    (BGR)
-        C_ROAD    = (30, 180,  30)   # GREEN
-        C_GARBAGE = (0, 140, 255)    # ORANGE
-        C_ABUSE   = (180,  0, 180)   # PURPLE
-
-        def draw_box(img, x1, y1, x2, y2, color, label):
-            cv2.rectangle(img, (x1, y1), (x2, y2), color, 3)
-            (tw, th), _ = cv2.getTextSize(label, font, fs, thick)
-            ly = max(y1 - 6, th + 6)
-            cv2.rectangle(img, (x1, ly - th - 5), (x1 + tw + 6, ly + 3), color, -1)
-            cv2.putText(img, label, (x1 + 3, ly - 1), font, fs, (255, 255, 255), thick)
-
-        # 1. HUMAN boxes (already computed this request - zero extra cost)
-        for (x1, y1, x2, y2) in human_boxes:
-            draw_box(annotated, x1, y1, x2, y2, C_HUMAN, 'HUMAN')
-
-        # 2. GARBAGE boxes
-        if garbage_model is not None:
-            try:
-                with torch.no_grad():
-                    g_res = garbage_model(img_color, verbose=False)
-                if g_res and len(g_res[0].boxes) > 0:
-                    names = g_res[0].names or {}
-                    for box, conf, cls in zip(g_res[0].boxes.xyxy.cpu().numpy(),
-                                              g_res[0].boxes.conf.cpu().numpy(),
-                                              g_res[0].boxes.cls.cpu().numpy()):
-                        if conf >= 0.25:
-                            x1, y1, x2, y2 = map(int, box)
-                            draw_box(annotated, x1, y1, x2, y2, C_GARBAGE,
-                                     f"GARBAGE:{names.get(int(cls),'?')} {conf:.0%}")
-            except Exception:
-                pass
-
-        # 3. ROAD boxes (use first model from ensemble for visualisation)
-        if enhanced_road_detector and enhanced_road_detector.road_models:
-            try:
-                with torch.no_grad():
-                    r_res = enhanced_road_detector.road_models[0](img_color, verbose=False, conf=0.15)
-                if r_res and len(r_res[0].boxes) > 0:
-                    names = r_res[0].names or {}
-                    for box, conf, cls in zip(r_res[0].boxes.xyxy.cpu().numpy(),
-                                              r_res[0].boxes.conf.cpu().numpy(),
-                                              r_res[0].boxes.cls.cpu().numpy()):
-                        if conf >= 0.15:
-                            x1, y1, x2, y2 = map(int, box)
-                            draw_box(annotated, x1, y1, x2, y2, C_ROAD,
-                                     f"ROAD:{names.get(int(cls),'road')} {conf:.0%}")
-            except Exception:
-                pass
-
-        # 4. ABUSE / WEAPON boxes (main abuse model)
-        if abuse_model_main is not None:
-            try:
-                with torch.no_grad():
-                    a_res = abuse_model_main(img_color, verbose=False)
-                if a_res and len(a_res[0].boxes) > 0:
-                    names = a_res[0].names or {}
-                    for box, conf, cls in zip(a_res[0].boxes.xyxy.cpu().numpy(),
-                                              a_res[0].boxes.conf.cpu().numpy(),
-                                              a_res[0].boxes.cls.cpu().numpy()):
-                        if conf >= 0.35:
-                            x1, y1, x2, y2 = map(int, box)
-                            draw_box(annotated, x1, y1, x2, y2, C_ABUSE,
-                                     f"ABUSE:{names.get(int(cls),'?')} {conf:.0%}")
-            except Exception:
-                pass
-
-        # Legend overlay (semi-transparent, top-right)
-        legend = [
-            ('HUMAN  (YOLOv8 Privacy)',     C_HUMAN),
-            ('ROAD   (YOLOv8 x8 Ensemble)', C_ROAD),
-            ('GARBAGE(YOLOv8 Trained)',      C_GARBAGE),
-            ('ABUSE  (YOLOv8 Ensemble)',     C_ABUSE),
-        ]
-        leg_w, leg_h_item = 290, 28
-        leg_h = len(legend) * leg_h_item + 18
-        leg_x = max(0, w_img - leg_w - 10)
-        leg_y = 10
-        overlay = annotated.copy()
-        cv2.rectangle(overlay, (leg_x - 6, leg_y), (leg_x + leg_w, leg_y + leg_h), (20, 20, 20), -1)
-        # FIX: cv2.addWeighted does not support in-place dst=src2 — assign to new variable
-        annotated = cv2.addWeighted(overlay, 0.70, annotated, 0.30, 0)
-        for i, (lbl, col) in enumerate(legend):
-            ly = leg_y + 22 + i * leg_h_item
-            cv2.rectangle(annotated, (leg_x, ly - 14), (leg_x + 20, ly + 5), col, -1)
-            cv2.putText(annotated, lbl, (leg_x + 26, ly), font, 0.48, (255, 255, 255), 1)
-
-        _, buf = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 88])
-        return 'data:image/jpeg;base64,' + base64.b64encode(buf.tobytes()).decode('utf-8')
-
-    except Exception as e:
-        print(f"⚠️ Annotated image generation error: {e}")
-        # Fallback: return original image without annotations
-        try:
-            _, buf = cv2.imencode('.jpg', img_color, [cv2.IMWRITE_JPEG_QUALITY, 88])
-            return 'data:image/jpeg;base64,' + base64.b64encode(buf.tobytes()).decode('utf-8')
-        except Exception:
-            return None
-
-
 # HARISH'S COMPLETE TWO-PHASE FILTERATION SYSTEM
 # Add detailed debugging for model predictions
 STRICT_CONFIDENCE_THRESHOLD = 0.50  # Model confidence threshold (optimized during validation)
@@ -2021,7 +1903,6 @@ def analyze_content(image_data, description):
             'confidence_source': 'actual_detector_output'
         },
         'morphed_image': morph_humans_in_image(img_color, human_boxes) if humans_detected and human_boxes else None,
-        'annotated_image': (lambda: generate_annotated_image(img_color, human_boxes))() if img_color is not None else None,
         'garbage_classification': {
             'status': garbage_status,
             'confidence': round(garbage_confidence, 2) if garbage_confidence > 0 else 0.0,
@@ -2462,25 +2343,6 @@ def home():
                 `;
             }
 
-            // ============ AI DETECTION VISUALISATION ============
-            let vizHtml = '';
-            if (data.annotated_image) {
-                vizHtml = `
-                    <div class="result-card" style="background:#1a1a2e; border:3px solid #4a4a8a; padding:18px; margin-bottom:16px;">
-                        <h2 style="color:#a8d8ff; margin:0 0 10px 0; font-size:1.1em;">&#128269; AI Detection Visualisation &mdash; All 5 Models</h2>
-                        <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:0.82em; margin-bottom:12px;">
-                            <span style="background:#e60000;color:#fff;padding:3px 9px;border-radius:4px;">&#9632; HUMAN (YOLOv8)</span>
-                            <span style="background:#1eb51e;color:#fff;padding:3px 9px;border-radius:4px;">&#9632; ROAD (YOLOv8 x8)</span>
-                            <span style="background:#e08c00;color:#fff;padding:3px 9px;border-radius:4px;">&#9632; GARBAGE (YOLOv8)</span>
-                            <span style="background:#b400b4;color:#fff;padding:3px 9px;border-radius:4px;">&#9632; ABUSE/WEAPON (YOLOv8)</span>
-                            <span style="background:#555;color:#ccc;padding:3px 9px;border-radius:4px;">&#9632; TEXT (DistilBERT &mdash; result panel)</span>
-                        </div>
-                        <img src="${data.annotated_image}" alt="Detection Visualisation"
-                             style="width:100%; max-height:480px; object-fit:contain; border-radius:8px; border:2px solid #4a4a8a;" />
-                    </div>
-                `;
-            }
-
             // Morph & Post card (only shown when humans detected and morphed image available)
             let morphCard = '';
             if (data.morphed_image) {
@@ -2497,7 +2359,7 @@ def home():
                 `;
             }
 
-            let html = vizHtml + morphCard + strikeWarning + `
+            let html = morphCard + strikeWarning + `
                 <div class="result-card ${statusClass}">
                     <h2>${icon} Final Decision: ${decision.status}</h2>
                     <p style="font-size: 1.1em; margin: 10px 0;"><strong>Reason:</strong> ${decision.reason}</p>
