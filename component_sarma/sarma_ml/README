@@ -1,0 +1,87 @@
+# sarma_ml — ML Module (VoiceUp Decision Support)
+
+This folder contains the Machine Learning (ML) pipeline used in the project to:
+- generate a realistic training dataset (Road + Garbage complaints)
+- train multi-task text classification models
+- evaluate models (accuracy, confusion matrix, sample predictions)
+- produce saved model artifacts used by the backend for real-time predictions
+
+✅ The backend uses the saved artifacts to support **Decision Support** (ML + GIS + recurrence)
+
+## 1) Folder Structure
+sarma_ml/
+├── training_sarma/
+│ ├── dataset_templated_sa.py
+│ ├── split_dataset_sa.py
+│ ├── generate_training_dataset_sa.py
+| ├── text_variation_utils_sa.py
+│ ├── train_models_sa.py
+│ ├── validate_models_sa.py
+│ └── init.py
+│
+├── data_sarma/
+│ └── labeled_sarma/
+│ └── complaints_training_sa.csv
+| └── complaints_test_sa.csv
+| └── complaints_training_sa.csv
+| └── complaints_val_sa.csv
+| └── complinets_train_sa.csv
+│
+├── artifacts_sarma/
+│ ├── tfidf_vectorizer.joblib
+│ ├── main_category_model.joblib
+│ ├── sub_category_model.joblib
+│ ├── priority_level_model.joblib
+│ ├── main_category_encoder.joblib
+│ ├── sub_category_encoder.joblib
+│ └── priority_level_encoder.joblib
+│
+└── reports_sarma/
+├── cm_main_category.csv
+├── cm_sub_category.csv
+├── cm_priority_level.csv
+└── sample_predictions.csv
+
+## 2) What This ML Does (Simple Explanation)
+
+The ML model reads the **expanded complaint text** and predicts:
+
+1. `main_category` → road / garbage  
+2. `sub_category` → one of the 4 types for each category  
+3. `priority_level` → Level 1 / Level 2 / Level 3  
+
+The backend combines this ML output with:
+- GIS context (near public places, remote area logic)
+- recurring complaint count
+
+So the system is **Decision Support**, not full automation.
+
+---
+
+## 3) Requirements (Packages to Install)
+
+> Use a Python virtual environment (recommended).
+
+### Create & activate venv (Windows)
+```bash
+python -m venv venv
+venv\Scripts\activate
+
+Install dependencies
+pip install numpy pandas scikit-learn joblib
+
+Minimum required for ML scripts:
+
+numpy
+pandas
+scikit-learn
+joblib
+
+STEP 1 — Generate Dataset
+STEP 2 — Train Models (creates artifacts)
+STEP 3 — Evaluate Models (creates reports)
+
+reports_sarma 
+The reports_sarma folder stores machine learning evaluation results such as confusion matrices 
+and accuracy reports generated during development. 
+It is not required during runtime and is only used to validate model performance.

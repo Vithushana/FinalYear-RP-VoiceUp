@@ -20,6 +20,8 @@ import Verified from "./pages/Verified";
 import Reposted from "./pages/Reposted";
 import OfficerProfile from "./pages/OfficerProfile";
 import ProtectedRoute from "./components/ProtectedRoute";
+import TextComplaints from "./pages/TextComplaints";
+import Compl from "./pages/ComplaintDetails_SA/ComplaintDetails_sa";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +36,8 @@ const App = () => (
           <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/issue/:id" element={<ProtectedRoute><IssueDetails /></ProtectedRoute>} />
           <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+          <Route path="/text-complaint" element={<ProtectedRoute><TextComplaints /></ProtectedRoute>} />
+          <Route path="/complaint/:id" element={<ProtectedRoute><Compl /></ProtectedRoute>} />
           <Route path="/seen" element={<ProtectedRoute><Seen /></ProtectedRoute>} />
           <Route path="/verified" element={<ProtectedRoute><Verified /></ProtectedRoute>} />
           <Route path="/pending" element={<ProtectedRoute><PendingIssues /></ProtectedRoute>} />

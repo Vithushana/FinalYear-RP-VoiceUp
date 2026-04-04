@@ -61,6 +61,8 @@ dependencies:
   
   # Package info
   package_info_plus: ^8.0.0
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:
