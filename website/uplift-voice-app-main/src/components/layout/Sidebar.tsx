@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import {
   Home,
   Inbox,
+  Text,
   FileText,
   Upload,
   Archive,
@@ -22,6 +23,7 @@ const Sidebar = () => {
   const menuItems = [
     { icon: Home, label: "Dashboard", path: "/dashboard", active: true },
     { icon: Inbox, label: "Inbox", path: "/inbox" },
+    { icon: Text, label: "Text Complaint", path: "/text-complaint" },
     { icon: FileText, label: "Seen", path: "/seen" },
     { icon: CheckCircle2, label: "Verified", path: "/verified" },
     { icon: MapPin, label: "Hold", path: "/on-hold" },

@@ -17,6 +17,16 @@ class ApiService {
       return 'http://192.168.239.154:5000/api';
     }
   }
+
+  static String get complaintBaseUrl {
+    if (kIsWeb) {
+      // Running in Chrome/Web - use localhost
+      return 'http://localhost:5004/api';
+    } else {
+      // Running on mobile device - use network IP
+      return 'http://192.168.239.154:5004/api';
+    }
+  }
   
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
@@ -530,4 +540,45 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
   }
+
+  // ============ FASTAPI ENGINE EXPANSION ============
+    Future<Map<String, dynamic>> submitComplaintPost({
+    required String text, // Final-ah select aana text (Raw or AI)
+    required bool isExpanded, // Checkbox state
+    required String location,
+    required String category,
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$complaintBaseUrl/complaints/submit"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "category": category,
+          "text": text, // UI-la irundhu vara final text
+          "expand_text": isExpanded, // User expand panna ninaikiraaraa nu
+          "location_link": location,
+          "latitude": latitude,
+          "longitude": longitude,
+        }),
+      );
+      
+      // Postman-la neenga paartha 200 OK success response inge return aagum
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {"status": "error", "message": e.toString()};
+    }
+  }
+
+  // 2. NEW FUNCTION: AI expansion-kaka mattum separate-ah oru call
+  Future<Map<String, dynamic>> expandText(String originalText) async {
+    final response = await http.post(
+      Uri.parse("$complaintBaseUrl/complaints/expand"), // FastAPI engine expansion endpoint
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"text": originalText}),
+    );
+    return jsonDecode(response.body);
+  }
+
 }

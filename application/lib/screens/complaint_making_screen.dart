@@ -6,6 +6,7 @@ import 'package:geocoding/geocoding.dart';
 import '../services/api_service.dart';
 import '../utils/location_helper_stub.dart'
     if (dart.library.html) '../utils/location_helper_web.dart';
+import './map_picker_screen_sa.dart';
 
 class ComplaintMakingScreen extends StatefulWidget {
   const ComplaintMakingScreen({super.key});
@@ -20,9 +21,13 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
 
   int selectedType = 0; // 0 = Road, 1 = Garbage
 
-  final titleCtrl = TextEditingController();
   final issueCtrl = TextEditingController();
   final locationCtrl = TextEditingController();
+
+  // Expanded text variables
+  final TextEditingController expandedCtrl = TextEditingController();
+  bool useExpandedText = false; 
+  bool isExpanding = false; 
 
   // GPS variables
   Position? _currentPosition;
@@ -39,7 +44,6 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
 
   @override
   void dispose() {
-    titleCtrl.dispose();
     issueCtrl.dispose();
     locationCtrl.dispose();
     super.dispose();
@@ -238,15 +242,37 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
 
   void _reset() {
     setState(() => selectedType = 0);
-    titleCtrl.clear();
     issueCtrl.clear();
     locationCtrl.clear();
     // Don't auto-fetch location - user can tap location button if needed
   }
 
+  // AI Expansion function 
+  Future<void> _expandWithAI() async {
+    if (issueCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please describe the issue first")),
+      );
+      return;
+    }
+
+    setState(() => isExpanding = true); // Show loader
+    try {
+      final result = await _api.expandText(issueCtrl.text.trim()); 
+      if (result['status'] == 'success') {
+        setState(() {
+          expandedCtrl.text = result['expanded_text'];
+        });
+      }
+    } catch (e) {
+      print("Expansion error: $e");
+    } finally {
+      setState(() => isExpanding = false);
+    }
+  }
+
   Future<void> _submit() async {
-    if (titleCtrl.text.trim().isEmpty || 
-        issueCtrl.text.trim().isEmpty || 
+    if ( issueCtrl.text.trim().isEmpty || 
         locationCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all fields')),
@@ -278,17 +304,15 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
       }
 
       // Submit to backend with GPS coordinates
-      final response = await _api.submitPost(
-        title: titleCtrl.text.trim(),
-        description: issueCtrl.text.trim(),
+      final response = await _api.submitComplaintPost(
+        text: useExpandedText && expandedCtrl.text.isNotEmpty 
+              ? expandedCtrl.text 
+              : issueCtrl.text.trim(), 
+        isExpanded: useExpandedText, 
         location: locationCtrl.text.trim(),
+        category: selectedType == 0 ? 'road' : 'garbage',
         latitude: _latitude,
         longitude: _longitude,
-        province: province,
-        district: district,
-        issueType: selectedType == 0 ? 'Road' : 'Garbage',
-        images: [], // No images for complaint form
-        priority: 'high', // Complaints are high priority
       );
 
       if (mounted) {
@@ -370,38 +394,11 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
                   ),
 
                   const SizedBox(height: 12),
-
-                  // ====== Short title
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      "Short title",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: titleCtrl,
-                    decoration: InputDecoration(
-                      hintText: "e.g: Broken road near hospital",
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // ====== Report the issue
+/*
+=                  ================================ 
+=                         Report the issue
+=                  ==============================
+*/
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -440,9 +437,102 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
                     ),
                   ),
 
+                  const SizedBox(height: 6),
+
+/*
+=                         =============================================
+=                                      Expanded text controls 
+=                         ============================================
+*/
+
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    color: Colors.grey[200],
+                    child: Row(
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: isExpanding ? null : _expandWithAI, // Backend function call
+                          icon: isExpanding 
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.auto_awesome),
+                          label: const Text("Expand with AI"),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => expandedCtrl.clear(), // Top Re-set logic
+                          icon: const Icon(Icons.refresh),
+                        ),
+                        Checkbox(
+                          value: useExpandedText, 
+                          onChanged: (val) => setState(() => useExpandedText = val!),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                // Expanded text controls preview box  
+                  if (expandedCtrl.text.isNotEmpty) 
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50], 
+                        border: Border.all(color: Colors.blue.withOpacity(0.5)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.auto_awesome, size: 18, color: Colors.blue),
+                              SizedBox(width: 8),
+                              Text("AI Refined Evidence Preview:", 
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: expandedCtrl,
+                            maxLines: null,
+                            readOnly: true, 
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              isDense: true,
+                            ),
+                            style: const TextStyle(fontSize: 14, color: Colors.black87),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   const SizedBox(height: 12),
 
-                  // ====== Location
+                  // 3. AI EXPANDED TEXT BOX
+                  SizedBox(
+                    height: 100,
+                    child: TextField(
+                      controller: expandedCtrl, // AI text inge dhaan fill aagum
+                      maxLines: null,
+                      expands: true,
+                      decoration: InputDecoration(
+                        hintText: "Expanded with AI.......",
+                        filled: true,
+                        fillColor: Colors.grey[100],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+/*
+=                       =============================================
+=                                        Location
+=                       =================================================
+*/
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -467,16 +557,55 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.my_location),
-                        onPressed: _getCurrentLocation,
-                      ),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.my_location),
+                      onPressed: () async {
+                        // 1) First get GPS (so map opens near you)
+                        await _getCurrentLocation();
+
+                        if (_latitude == null || _longitude == null) return;
+
+                        // 2) Open map picker
+                        final picked = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => MapPickerScreenSA(
+                              initialLat: _latitude!,
+                              initialLng: _longitude!,
+                            ),
+                          ),
+                        );
+
+                        if (picked != null) {
+                          // latlong2 LatLng has double latitude/longitude
+                          final double lat = picked.latitude;
+                          final double lng = picked.longitude;
+
+                          setState(() {
+                            _latitude = lat;
+                            _longitude = lng;
+                            String mapsLink = "https://www.google.com/maps?q=$lat,$lng";
+                            locationCtrl.text = mapsLink;
+                          });
+
+                          //ONLY Google Maps link (no numeric display)
+                          locationCtrl.text =
+                              "https://www.google.com/maps?q=${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}";
+                        }
+                      },
+                    ),
+
                     ),
                   ),
 
                   const SizedBox(height: 14),
 
-                  // ====== Bottom buttons
+
+/* 
+=             ============================ 
+=                     Bottom buttons
+=             ============================
+*/
                   Row(
                     children: [
                       Expanded(
@@ -530,12 +659,19 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
     );
   }
 
+/*
+=                         ==============================================
+=                                      Segmented Button Widget 
+=                         ============================================== 
+*/
+
+
   Widget _segBtn(String text, bool selected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 90,
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        // width: MediaQuery.of(context).size.width * 0.92,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected ? darkBlue : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
@@ -552,4 +688,5 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
       ),
     );
   }
+
 }
