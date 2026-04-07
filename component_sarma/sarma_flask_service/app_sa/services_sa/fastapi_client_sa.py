@@ -39,4 +39,15 @@ def forward_list_all() -> list:
     except Exception as e:
         err = f"Error forwarding list_all to FastAPI ({url}): {e}"
         print(err)
+        raise RuntimeError(err) 
+
+def forward_officer_complaint(complaint_id: int) -> dict:
+    url = f"{FASTAPI_BASE}/officer/complaint/{complaint_id}"
+    try:
+        r = requests.get(url, timeout=60)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        err = f"Error forwarding officer complaint to FastAPI ({url}): {e}"
+        print(err)
         raise RuntimeError(err)

@@ -10,6 +10,8 @@ from app.services_sarma.recurring_detection_service_sa import detect_recurring_c
 from app.services_sarma.officer_output_service_sa import build_officer_output
 from app.services_sarma.ml_prediction_service_sa import predict_from_text
 
+from flask import Blueprint, jsonify
+
 
 router = APIRouter(prefix="/officer", tags=["Officer"])
 
@@ -20,6 +22,16 @@ def get_db():
         yield db
     finally:
         db.close()
+
+officer_bp = Blueprint("officer_bp", __name__)
+
+@officer_bp.get("/complaint/<int:complaint_id>")
+def get_officer_complaint(complaint_id):
+    try:
+        out = forward_officer_complaint(complaint_id)
+        return jsonify(out), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @router.get("/complaint/{complaint_id}")

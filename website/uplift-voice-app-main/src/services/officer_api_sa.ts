@@ -2,7 +2,7 @@ import axios from "axios";
 import type { ComplaintListItem, OfficerOutput } from "../components/types_sa/complaint_types_sa";
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL: "http://127.0.0.1:5004/api",
 });
 
 export async function getAllComplaints(): Promise<ComplaintListItem[]> {
