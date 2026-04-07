@@ -6,6 +6,7 @@ import 'package:geocoding/geocoding.dart';
 import '../services/api_service.dart';
 import '../utils/location_helper_stub.dart'
     if (dart.library.html) '../utils/location_helper_web.dart';
+import './map_picker_screen_sa.dart';
 
 class ComplaintMakingScreen extends StatefulWidget {
   const ComplaintMakingScreen({super.key});
@@ -23,6 +24,9 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
   final titleCtrl = TextEditingController();
   final issueCtrl = TextEditingController();
   final locationCtrl = TextEditingController();
+  final expandedCtrl = TextEditingController();
+  bool useExpandedText = false;
+  bool isExpanding = false;
 
   // GPS variables
   Position? _currentPosition;
@@ -42,6 +46,7 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
     titleCtrl.dispose();
     issueCtrl.dispose();
     locationCtrl.dispose();
+    expandedCtrl.dispose();
     super.dispose();
   }
 
@@ -241,7 +246,66 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
     titleCtrl.clear();
     issueCtrl.clear();
     locationCtrl.clear();
+    expandedCtrl.clear();
+    useExpandedText = false;
     // Don't auto-fetch location - user can tap location button if needed
+  }
+
+  Future<void> _expandWithAI() async {
+    if (issueCtrl.text.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please describe the issue first')),
+        );
+      }
+      return;
+    }
+
+    setState(() => isExpanding = true);
+    try {
+      final result = await _api.expandText(issueCtrl.text.trim());
+      if (result['status'] == 'success' && result['expanded_text'] != null) {
+        setState(() {
+          expandedCtrl.text = result['expanded_text'];
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AI expansion service unavailable')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isExpanding = false);
+      }
+    }
+  }
+
+  Future<void> _pickFromMap() async {
+    await _getCurrentLocation();
+    if (_latitude == null || _longitude == null) return;
+
+    final picked = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPickerScreenSA(
+          initialLat: _latitude!,
+          initialLng: _longitude!,
+        ),
+      ),
+    );
+
+    if (picked != null) {
+      final double lat = picked.latitude;
+      final double lng = picked.longitude;
+      setState(() {
+        _latitude = lat;
+        _longitude = lng;
+        locationCtrl.text =
+            'https://www.google.com/maps?q=${lat.toStringAsFixed(6)},${lng.toStringAsFixed(6)}';
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -280,7 +344,9 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
       // Submit to backend with GPS coordinates
       final response = await _api.submitPost(
         title: titleCtrl.text.trim(),
-        description: issueCtrl.text.trim(),
+        description: useExpandedText && expandedCtrl.text.trim().isNotEmpty
+            ? expandedCtrl.text.trim()
+            : issueCtrl.text.trim(),
         location: locationCtrl.text.trim(),
         latitude: _latitude,
         longitude: _longitude,
@@ -290,6 +356,8 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
         images: [], // No images for complaint form
         priority: 'high', // Complaints are high priority
       );
+
+      print('Complaint submit response: $response');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -440,6 +508,47 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
                     ),
                   ),
 
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: isExpanding ? null : _expandWithAI,
+                        icon: isExpanding
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.auto_awesome, size: 16),
+                        label: const Text('Expand with AI'),
+                      ),
+                      const SizedBox(width: 8),
+                      Checkbox(
+                        value: useExpandedText,
+                        onChanged: (v) => setState(() => useExpandedText = v ?? false),
+                      ),
+                      const Text('Use expanded text'),
+                    ],
+                  ),
+                  if (expandedCtrl.text.trim().isNotEmpty)
+                    SizedBox(
+                      height: 90,
+                      child: TextField(
+                        controller: expandedCtrl,
+                        maxLines: null,
+                        expands: true,
+                        readOnly: true,
+                        decoration: InputDecoration(
+                          hintText: 'Expanded text preview',
+                          filled: true,
+                          fillColor: Colors.blue[50],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
+                    ),
+
                   const SizedBox(height: 12),
 
                   // ====== Location
@@ -471,6 +580,15 @@ class _ComplaintMakingScreenState extends State<ComplaintMakingScreen> {
                         icon: const Icon(Icons.my_location),
                         onPressed: _getCurrentLocation,
                       ),
+                    ),
+                  ),
+
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _pickFromMap,
+                      icon: const Icon(Icons.map),
+                      label: const Text('Pick on map (optional)'),
                     ),
                   ),
 

@@ -17,6 +17,14 @@ class ApiService {
       return 'http://192.168.239.154:5000/api';
     }
   }
+
+  static String get complaintBaseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5004/api';
+    } else {
+      return 'http://192.168.239.154:5004/api';
+    }
+  }
   
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
@@ -529,5 +537,43 @@ class ApiService {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
+  }
+
+  // Additive APIs for Sarma complaint pipeline.
+  Future<Map<String, dynamic>> submitComplaintPost({
+    required String text,
+    required bool isExpanded,
+    required String location,
+    required String category,
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$complaintBaseUrl/complaints/submit'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'category': category,
+          'text': text,
+          'expand_text': isExpanded,
+          'location_link': location,
+          'latitude': latitude,
+          'longitude': longitude,
+        }),
+      );
+
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'status': 'error', 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> expandText(String originalText) async {
+    final response = await http.post(
+      Uri.parse('$complaintBaseUrl/complaints/expand'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'text': originalText}),
+    );
+    return jsonDecode(response.body);
   }
 }
