@@ -1,12 +1,12 @@
-#The system explains why a priority is assigned, not just the score.
+# officer_output_service_sa.py
+# The system explains why a priority is assigned, not just the score.
 
-from app.services_sarma.text_severity_service_sa import calculate_text_severity
+from app.services_sarma.text_severity_ml_service_sa import predict_text_severity_ml
 from app.services_sarma.gis_usage_service_sa import calculate_hybrid_gis_score
 from app.services_sarma.recurring_severity_service_sa import calculate_recurring_severity
 from app.services_sarma.priority_scoring_service_sa import calculate_priority_score
 from app.services_sarma.priority_level_service_sa import determine_priority_level
 from app.services_sarma.track_decision_service_sa import determine_priority_track
-
 from app.services_sarma.reverse_geocode_service_sa import get_place_hint
 from app.services_sarma.officer_brief_service_sa import build_officer_brief
 
@@ -29,11 +29,14 @@ def build_officer_output(
     junction_density: int,
     nearby_complaint_count: int,
 
-    ml_result: dict
+    ml_result: dict | None
 ) -> dict:
 
-    # 1) Text severity
-    text_scores = calculate_text_severity(expanded_text)
+    ml_result = ml_result or {}
+
+    # 1) ML-based text severity
+    text_result = predict_text_severity_ml(expanded_text)
+    text_severity_score = int(text_result.get("text_severity_ml", 0))
 
     # 2) Hybrid GIS
     gis_result = calculate_hybrid_gis_score(
@@ -53,12 +56,13 @@ def build_officer_output(
 
     # 3) Recurring severity
     recurring_scores = calculate_recurring_severity(recurring_count)
+    recurring_severity_score = int(recurring_scores.get("recurring_severity", 0))
 
     # 4) Final priority score
     score_result = calculate_priority_score(
-        text_severity=text_scores["text_severity"],
+        text_severity=text_severity_score,
         gis_severity=gis_score,
-        recurring_severity=recurring_scores["recurring_severity"]
+        recurring_severity=recurring_severity_score
     )
 
     # 5) Priority level
@@ -78,34 +82,47 @@ def build_officer_output(
         action_time = "Planned (within 1–2 weeks)"
         risk_category = "Low"
 
-    # 8) Why list (short)
+    # 8) Why list
     why_list = []
-    if text_scores.get("urgency_score", 0) >= 15:
-        why_list.append("Text indicates high urgency.")
-    if text_scores.get("impact_score", 0) >= 15:
-        why_list.append("Text indicates high public impact.")
-    if text_scores.get("frequency_score", 0) >= 10:
-        why_list.append("Text indicates the issue is frequent or recurring.")
 
-    # Include GIS analysis in structured `gis` object only; avoid duplicating the
-    # full summary in the short 'why' list presented at the top-level.
-    # If a short note is useful, add a concise entry instead.
-    if gis_result.get("gis_score", 0) > 0:
-        why_list.append(f"GIS impact detected (score: {int(gis_result.get('gis_score',0))}).")
-    why_list.append(recurring_scores.get("recurring_reason", "Recurring analysis completed."))
+    if text_severity_score >= 28:
+        why_list.append(
+            f"ML text analysis indicates high textual severity (score: {text_severity_score}/40)."
+        )
+    elif text_severity_score >= 15:
+        why_list.append(
+            f"ML text analysis indicates medium textual severity (score: {text_severity_score}/40)."
+        )
+    else:
+        why_list.append(
+            f"ML text analysis indicates low textual severity (score: {text_severity_score}/40)."
+        )
+
+    if gis_score > 0:
+        why_list.append(f"GIS impact detected (score: {gis_score}).")
+
+    why_list.append(
+        recurring_scores.get("recurring_reason", "Recurring analysis completed.")
+    )
 
     # 9) AI note
     conf = float(ml_result.get("confidence", 0))
-    note = "AI is supporting info only. Final decision is based on Hybrid score (Text + GIS + Recurring)."
+    note = (
+        "AI is supporting info only. Final decision is based on Hybrid score "
+        "(ML Text Severity + GIS + Recurring)."
+    )
     if conf < 0.70:
-        note = "AI confidence is moderate/low. Final decision is based on Hybrid score (Text + GIS + Recurring)."
+        note = (
+            "AI classification confidence is moderate/low. Final decision is based on "
+            "Hybrid score (ML Text Severity + GIS + Recurring)."
+        )
 
-    # 10) Place hint    
+    # 10) Place hint
     place_hint = get_place_hint(latitude, longitude)
-
     if not place_hint and poi_details:
-        place_hint = f"Near {poi_details[0].get('name','')}".strip() or None
-    
+        place_hint = f"Near {poi_details[0].get('name', '')}".strip() or None
+
+    # 11) Officer brief
     officer_brief = build_officer_brief(
         category=category,
         expanded_text=expanded_text,
@@ -114,7 +131,6 @@ def build_officer_output(
         poi_details=poi_details,
     )
 
-    #  Clean structured output
     return {
         "summary": {
             "complaint_id": complaint_id,
@@ -123,7 +139,7 @@ def build_officer_output(
             "priority_label": level_result["priority_label"],
             "priority_score": score_result["priority_score"],
             "risk_category": risk_category,
-            "recommended_action_time": action_time
+            "recommended_action_time": action_time,
         },
 
         "complaint": {
@@ -134,7 +150,7 @@ def build_officer_output(
             "place_hint": place_hint,
             "latitude": latitude,
             "longitude": longitude,
-            "location_link": location_link
+            "location_link": location_link,
         },
 
         "why_this_priority": why_list,
@@ -144,7 +160,6 @@ def build_officer_output(
         "gis": {
             "gis_score": gis_score,
             "gis_summary": gis_result.get("gis_summary", ""),
-
             "officer_display_summary": (
                 (gis_result.get("gis_summary", "") or "").split("|")[0].strip()
                 or "GIS context processed."
@@ -156,9 +171,7 @@ def build_officer_output(
                 "crowd_score": gis_breakdown.get("crowd_score", 0),
                 "complaint_density_score": gis_breakdown.get("complaint_density_score", 0),
             },
-
             "poi_details": poi_details,
-
             "alternate_routes_count": alternate_routes_count,
             "nearest_alt_crossing_km": nearest_alt_crossing_km,
             "junction_density": junction_density,
@@ -167,13 +180,16 @@ def build_officer_output(
         "recurring": {
             "recurring_count": recurring_count,
             "is_recurring": is_recurring,
-            "recurring_reason": recurring_scores.get("recurring_reason", "")
+            "recurring_reason": recurring_scores.get("recurring_reason", ""),
         },
 
         "ai_suggestion": {
             "priority_level_ml": ml_result.get("priority_level_ml"),
             "confidence": conf,
-            "note": note
+            "note": note,
+            "text_severity_ml": text_severity_score,
+            "text_severity_label": text_result.get("severity_label"),
+            "text_model": text_result.get("model_name"),
         },
 
         "track": {

@@ -417,6 +417,54 @@ return (
             </div>
           </div>
 
+
+
+
+{/*
+
+                            TRACK CARD 
+
+*/}
+          <div className="card_sa">
+            <div className="card_head_sa">Track</div>
+
+            <div className="card_body_sa space-y-2">
+              <p>
+                <b>Current Track:</b>{" "}
+                <span className="font-semibold">
+                  {data.track?.track ?? "-"}
+                </span>
+              </p>
+
+              {/* Responsible unit */}
+              {data.track?.responsible_unit && (
+                <p className="text-sm">
+                  <b>Responsible Unit:</b> {data.track.responsible_unit}
+                </p>
+              )}
+
+              {/* Suggested action */}
+              {data.track?.suggested_action && (
+                <p className="text-sm">
+                  <b>Suggested Action:</b> {data.track.suggested_action}
+                </p>
+              )}
+
+              {/* Why = Meaning only (professional) */}
+              <p className="text-sm text-gray-700">
+                <b>Why:</b>{" "}
+                {data.track?.track === "Planning"
+                  ? "Planning means this complaint may require a longer-term solution such as engineering assessment, resource allocation, or service redesign (beyond routine field work)."
+                  : "Operational means this complaint can be handled through routine field operations and maintenance work (day-to-day service delivery)."}
+              </p>
+            </div>
+          </div>
+
+          {/*
+
+                                  Officer Brief Card
+
+*/}
           <div className="card_sa">
             <div className="card_head_sa">Officer Quick Brief</div>
 
@@ -462,47 +510,6 @@ return (
                   <p className="text-sm text-gray-500 mt-1">No checks available.</p>
                 )}
               </div>
-            </div>
-          </div>
-
-
-{/*
-
-                            TRACK CARD 
-
-*/}
-          <div className="card_sa">
-            <div className="card_head_sa">Track</div>
-
-            <div className="card_body_sa space-y-2">
-              <p>
-                <b>Current Track:</b>{" "}
-                <span className="font-semibold">
-                  {data.track?.track ?? "-"}
-                </span>
-              </p>
-
-              {/* Responsible unit */}
-              {data.track?.responsible_unit && (
-                <p className="text-sm">
-                  <b>Responsible Unit:</b> {data.track.responsible_unit}
-                </p>
-              )}
-
-              {/* Suggested action */}
-              {data.track?.suggested_action && (
-                <p className="text-sm">
-                  <b>Suggested Action:</b> {data.track.suggested_action}
-                </p>
-              )}
-
-              {/* Why = Meaning only (professional) */}
-              <p className="text-sm text-gray-700">
-                <b>Why:</b>{" "}
-                {data.track?.track === "Planning"
-                  ? "Planning means this complaint may require a longer-term solution such as engineering assessment, resource allocation, or service redesign (beyond routine field work)."
-                  : "Operational means this complaint can be handled through routine field operations and maintenance work (day-to-day service delivery)."}
-              </p>
             </div>
           </div>
         </div>

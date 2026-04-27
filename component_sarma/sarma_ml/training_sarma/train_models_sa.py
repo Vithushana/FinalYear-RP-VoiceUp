@@ -6,11 +6,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 
-# Paths to training data and artifacts
-TRAIN_PATH = os.path.join("data_sarma", "labeled_sarma", "complaints_train_sa.csv")
-ARTIFACT_DIR = os.path.join("artifacts_sarma")
+TRAIN_PATH = os.path.join("sarma_ml", "data_sarma", "labeled_sarma", "complaints_train_sa.csv")
+ARTIFACT_DIR = os.path.join("sarma_ml", "artifacts_sarma")
 
-# Function to load and clean data
+
 def load_and_clean(path: str) -> pd.DataFrame:
     if not os.path.exists(path):
         raise FileNotFoundError(f"Dataset not found: {path}")
@@ -23,7 +22,7 @@ def load_and_clean(path: str) -> pd.DataFrame:
 
     return df
 
-# Main training function 
+
 def train_and_save():
     df = load_and_clean(TRAIN_PATH)
 
@@ -32,7 +31,6 @@ def train_and_save():
     y_sub = df["sub_category"].astype(str).values
     y_pri = df["priority_level"].astype(str).values
 
-    # Vectorizer
     vectorizer = TfidfVectorizer(
         lowercase=True,
         ngram_range=(1, 2),
@@ -40,7 +38,6 @@ def train_and_save():
     )
     X_vec = vectorizer.fit_transform(X)
 
-    # Encoders
     main_enc = LabelEncoder()
     sub_enc = LabelEncoder()
     pri_enc = LabelEncoder()
@@ -49,7 +46,6 @@ def train_and_save():
     y_sub_enc = sub_enc.fit_transform(y_sub)
     y_pri_enc = pri_enc.fit_transform(y_pri)
 
-    # Models
     main_model = LogisticRegression(max_iter=2000)
     sub_model = LogisticRegression(max_iter=4000)
     pri_model = LogisticRegression(max_iter=2000)
@@ -58,7 +54,6 @@ def train_and_save():
     sub_model.fit(X_vec, y_sub_enc)
     pri_model.fit(X_vec, y_pri_enc)
 
-    # Save artifacts
     os.makedirs(ARTIFACT_DIR, exist_ok=True)
 
     joblib.dump(vectorizer, os.path.join(ARTIFACT_DIR, "tfidf_vectorizer.joblib"))

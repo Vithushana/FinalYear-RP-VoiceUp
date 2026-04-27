@@ -1,87 +1,282 @@
-# sarma_ml — ML Module (VoiceUp Decision Support)
 
-This folder contains the Machine Learning (ML) pipeline used in the project to:
-- generate a realistic training dataset (Road + Garbage complaints)
-- train multi-task text classification models
-- evaluate models (accuracy, confusion matrix, sample predictions)
-- produce saved model artifacts used by the backend for real-time predictions
+```markdown
+# ML Module Details — VoiceUp Decision Support
 
-✅ The backend uses the saved artifacts to support **Decision Support** (ML + GIS + recurrence)
+## Overview
 
-## 1) Folder Structure
-sarma_ml/
-├── training_sarma/
-│ ├── dataset_templated_sa.py
-│ ├── split_dataset_sa.py
-│ ├── generate_training_dataset_sa.py
-| ├── text_variation_utils_sa.py
-│ ├── train_models_sa.py
-│ ├── validate_models_sa.py
-│ └── init.py
-│
-├── data_sarma/
-│ └── labeled_sarma/
-│ └── complaints_training_sa.csv
-| └── complaints_test_sa.csv
-| └── complaints_training_sa.csv
-| └── complaints_val_sa.csv
-| └── complinets_train_sa.csv
-│
-├── artifacts_sarma/
-│ ├── tfidf_vectorizer.joblib
-│ ├── main_category_model.joblib
-│ ├── sub_category_model.joblib
-│ ├── priority_level_model.joblib
-│ ├── main_category_encoder.joblib
-│ ├── sub_category_encoder.joblib
-│ └── priority_level_encoder.joblib
-│
-└── reports_sarma/
-├── cm_main_category.csv
-├── cm_sub_category.csv
-├── cm_priority_level.csv
-└── sample_predictions.csv
+This document provides the detailed internal explanation of the `sarma_ml` module used in the VoiceUp project.
 
-## 2) What This ML Does (Simple Explanation)
+The purpose of this module is to support the larger VoiceUp Decision Support System by providing a machine learning pipeline for complaint text understanding, classification, text severity scoring, evaluation, and research graph generation.
 
-The ML model reads the **expanded complaint text** and predicts:
+This ML module focuses specifically on the **text-analysis part** of the project.
 
-1. `main_category` → road / garbage  
-2. `sub_category` → one of the 4 types for each category  
-3. `priority_level` → Level 1 / Level 2 / Level 3  
+It is responsible for:
 
-The backend combines this ML output with:
-- GIS context (near public places, remote area logic)
-- recurring complaint count
+- generating a realistic complaint dataset
+- creating text variations for better robustness
+- splitting the dataset into train / validation / test sets
+- training TF-IDF based classification models
+- training an ML-based text severity scoring model
+- validating model performance
+- generating research graphs for the research paper
+- saving trained artifacts for backend integration
 
-So the system is **Decision Support**, not full automation.
+The final system is **not fully automated**.  
+The ML output is only one part of the full hybrid pipeline.  
+The backend combines:
+
+- ML-based text severity
+- GIS context scoring
+- recurring complaint analysis
+
+to generate a final hybrid priority score.  
+The final decision is still made by the responsible officer.
 
 ---
 
-## 3) Requirements (Packages to Install)
+## Project Role of This Module
 
-> Use a Python virtual environment (recommended).
+In the full VoiceUp architecture, this folder provides the **ML text intelligence layer**.
 
-### Create & activate venv (Windows)
-```bash
-python -m venv venv
-venv\Scripts\activate
+### The ML module supports:
+- complaint understanding from text
+- category prediction
+- sub-category prediction
+- priority support prediction
+- text severity prediction
 
-Install dependencies
-pip install numpy pandas scikit-learn joblib
+### The backend then combines ML output with:
+- GIS-based spatial evidence
+- recurrence evidence
+- rule-based and structured decision support logic
 
-Minimum required for ML scripts:
+So this module is part of a **Decision Support System**, not an autonomous decision engine.
 
-numpy
-pandas
-scikit-learn
-joblib
+---
 
-STEP 1 — Generate Dataset
-STEP 2 — Train Models (creates artifacts)
-STEP 3 — Evaluate Models (creates reports)
+## Main Purpose of Each File
 
-reports_sarma 
-The reports_sarma folder stores machine learning evaluation results such as confusion matrices 
-and accuracy reports generated during development. 
-It is not required during runtime and is only used to validate model performance.
+### `dataset_templated_sa.py`
+This file contains the structured complaint templates used to generate the training dataset.
+
+Each template defines:
+- main category
+- sub-category
+- priority level
+- severity score
+- base complaint sentences
+
+This file acts as the base supervision source for synthetic dataset generation.
+
+---
+
+### `text_variation_utils_sa.py`
+This file creates realistic text variations from template complaints.
+
+It applies:
+- synonyms
+- filler phrases
+- prefixes and suffixes
+- typo injection
+- ambiguity injection
+- optional keyword removal
+- expanded text generation
+
+This helps create more realistic complaint text samples instead of only using rigid template sentences.
+
+---
+
+### `generate_training_dataset_sa.py`
+This script generates the full labeled complaint dataset.
+
+It:
+- reads template definitions
+- creates multiple complaint text variations
+- creates expanded complaint text
+- assigns labels
+- assigns text severity score
+- writes the final dataset into CSV format
+
+Output:
+- `complaints_training_sa.csv`
+
+---
+
+### `split_dataset_sa.py`
+This script splits the generated dataset into:
+- training set
+- validation set
+- test set
+
+It uses stratified splitting to preserve label balance as much as possible.
+
+Output:
+- `complaints_train_sa.csv`
+- `complaints_val_sa.csv`
+- `complaints_test_sa.csv`
+
+---
+
+### `train_models_sa.py`
+This script trains the TF-IDF based classification models.
+
+These models predict:
+- `main_category`
+- `sub_category`
+- `priority_level`
+
+Algorithm used:
+- TF-IDF vectorizer
+- Logistic Regression
+
+Output artifacts:
+- `tfidf_vectorizer.joblib`
+- classification models
+- label encoders
+
+---
+
+### `validate_models_sa.py`
+This script evaluates the complaint classification models on the validation set.
+
+It reports:
+- classification accuracy
+- classification report
+- label-wise evaluation
+
+This is used to measure the quality of the classification pipeline.
+
+---
+
+### `train_text_severity_model_sa.py`
+This script trains a separate ML model to predict **numeric text severity score**.
+
+This model is used for:
+- text-based severity estimation
+- hybrid priority scoring input
+
+Algorithm used:
+- TF-IDF vectorizer
+- Ridge Regression
+
+Output artifacts:
+- `tfidf_vectorizer_severity.joblib`
+- `text_severity_model.joblib`
+
+---
+
+### `validate_text_severity_model_sa.py`
+This script validates the text severity prediction model.
+
+It reports:
+- MAE
+- RMSE
+- R²
+- bucket accuracy (Low / Medium / High)
+
+This script is important for the research evaluation section.
+
+---
+
+### `generate_research_graphs_sa.py`
+This script creates visual graphs from the text severity validation results.
+
+It generates:
+- validation performance bar chart
+- actual vs predicted scatter plot
+- bucket confusion matrix
+
+These graphs are useful in the **Results / Evaluation** section of the research paper.
+
+---
+
+## What the ML Module Predicts
+
+This module performs two types of ML tasks.
+
+### 1. Complaint Classification
+Using complaint text, the model predicts:
+
+- `main_category`  
+  Example: road / garbage
+
+- `sub_category`  
+  Example: access_mobility, health_risk, infrastructure_gap, etc.
+
+- `priority_level`  
+  Example: Level 1 / Level 2 / Level 3
+
+These outputs are used as **supporting predictions**.
+
+---
+
+### 2. Text Severity Prediction
+A separate model predicts:
+
+- `severity_score`
+
+This is a numeric value representing the seriousness of the complaint text itself.
+
+This score is used as the **text component** inside the hybrid priority scoring pipeline.
+
+---
+
+## Data Flow of the ML Module
+
+### Complaint text processing flow
+
+```text
+Complaint Text
+    ↓
+Preprocessing / Text Variation
+    ↓
+TF-IDF Vectorization
+    ↓
+ML Model
+    ↓
+Prediction
+
+## Folder Structure
+
+```text
+sarma_ml/
+├── training_sarma/
+│   ├── dataset_templated_sa.py
+│   ├── generate_training_dataset_sa.py
+│   ├── split_dataset_sa.py
+│   ├── text_variation_utils_sa.py
+│   ├── train_models_sa.py
+│   ├── validate_models_sa.py
+│   ├── train_text_severity_model_sa.py
+│   ├── validate_text_severity_model_sa.py
+│   ├── generate_research_graphs_sa.py
+│   └── __init__.py
+│
+├── data_sarma/
+│   └── labeled_sarma/
+│       ├── complaints_training_sa.csv
+│       ├── complaints_train_sa.csv
+│       ├── complaints_val_sa.csv
+│       └── complaints_test_sa.csv
+│
+├── artifacts_sarma/
+│   ├── tfidf_vectorizer.joblib
+│   ├── main_category_model.joblib
+│   ├── sub_category_model.joblib
+│   ├── priority_level_model.joblib
+│   ├── main_category_encoder.joblib
+│   ├── sub_category_encoder.joblib
+│   ├── priority_level_encoder.joblib
+│   ├── tfidf_vectorizer_severity.joblib
+│   └── text_severity_model.joblib
+│
+├── results_sarma/
+│   ├── text_severity_metrics_bar_chart.png
+│   ├── actual_vs_predicted_scatter.png
+│   └── severity_bucket_confusion_matrix.png
+│
+└── reports_sarma/
+    ├── cm_main_category.csv
+    ├── cm_sub_category.csv
+    ├── cm_priority_level.csv
+    └── sample_predictions.csv
