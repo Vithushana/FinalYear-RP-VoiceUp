@@ -48,6 +48,7 @@ def build_officer_output(
         nearest_alt_crossing_km=nearest_alt_crossing_km,
         junction_density=junction_density,
         nearby_complaint_count=nearby_complaint_count,
+        category=category,
         expanded_text=expanded_text
     )
     gis_breakdown = gis_result.get("gis_breakdown", {}) or {}

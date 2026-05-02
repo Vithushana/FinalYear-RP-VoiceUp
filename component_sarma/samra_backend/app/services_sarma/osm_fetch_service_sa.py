@@ -109,12 +109,12 @@ def fetch_osm_features(lat: float, lon: float) -> Dict:
     combined_query = f"""
     [out:json][timeout:35];
     (
-      nwr["amenity"~"school|college|university|hospital|marketplace|bus_station"](around:2000,{lat},{lon});
-      nwr["shop"~"market|supermarket|mall"](around:2000,{lat},{lon});
-      nwr["landuse"~"commercial|retail"](around:2000,{lat},{lon});
+      nwr["amenity"~"school|college|university|hospital|marketplace|bus_station"](around:1000,{lat},{lon});
+      nwr["shop"~"market|supermarket|mall"](around:1000,{lat},{lon});
+      nwr["landuse"~"commercial|retail"](around:1000,{lat},{lon});
       way["highway"](around:1200,{lat},{lon});
-      nwr["bridge"](around:4000,{lat},{lon});
-      node["highway"="crossing"](around:4000,{lat},{lon});
+      nwr["bridge"](around:2000,{lat},{lon});
+      node["highway"="crossing"](around:2000,{lat},{lon});
       node(around:400,{lat},{lon})["highway"~"junction|traffic_signals"];
     );
     out center tags;

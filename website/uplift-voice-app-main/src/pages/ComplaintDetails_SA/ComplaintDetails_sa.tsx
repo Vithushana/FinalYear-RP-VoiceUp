@@ -344,8 +344,39 @@ return (
                             </div>
 
                             <div className="text-xs text-gray-600">
-                              <span className="font-medium">Distance:</span> {Math.round(Number(distance))} m
+                              <span className="font-medium">Distance:</span> {Math.round(Number(distance))} m 
+                                {/* Namma puthusa add panna Distance Type inga varum */}
+                                {poi.distance_type && (
+                                  <span className="text-gray-400 italic ml-1 text-[10px]">
+                                    ({poi.distance_type})
+                                  </span>
+                                )}                            
                             </div>
+                            
+                            {/* --- NEW SPATIO-TEMPORAL UI ADDITION --- */}
+                            {poi.activity_level_now && (
+                              <div className="mt-2 pt-2 border-t border-gray-100 flex flex-col gap-1">
+                                <div className="flex items-center gap-2 text-xs">
+                                  <span className="font-medium text-gray-600">Activity Now:</span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
+                                    ${poi.activity_level_now.toLowerCase() === 'high' 
+                                        ? 'bg-red-100 text-red-700' 
+                                        : poi.activity_level_now.toLowerCase() === 'medium' 
+                                            ? 'bg-orange-100 text-orange-700' 
+                                            : 'bg-green-100 text-green-700'}`}
+                                  >
+                                    {poi.activity_level_now}
+                                  </span>
+                                </div>
+                                {poi.activity_reason && (
+                                  <div className="text-[11px] text-gray-500 italic mt-0.5 leading-tight">
+                                    ({poi.activity_reason})
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {/* -------------------------------------- */}
+
                           </div>
                         );
                       })}

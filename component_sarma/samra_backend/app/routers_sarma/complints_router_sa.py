@@ -88,6 +88,7 @@ def submit_complaint(payload: ComplaintInput, db: Session = Depends(get_db)):
                 nearest_alt_crossing_km=float(osm.get("nearest_alt_crossing_km", 99.0)),
                 junction_density=int(osm.get("junction_density", 0)),
                 nearby_complaint_count=1,
+                category=payload.category,
                 expanded_text=final_text 
             )
         except Exception as e:
