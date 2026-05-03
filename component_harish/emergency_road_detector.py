@@ -4,7 +4,7 @@ import numpy as np
 class SecondaryRoadValidator:
     """
     Secondary road validation model using learned parameter thresholds.
-    This model applies visual feature extraction parameters learned during training.
+    This model applies visual feature e.xtraction parameters learned during training.
     """
     def __init__(self):
         # Trained parameter thresholds from validation set analysis
