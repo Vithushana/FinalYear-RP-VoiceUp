@@ -1,9 +1,0 @@
-path: F:/Current/2025 Slit_July Active/Road Damage - 0769191226 G1/V2/NewDataset
-
-train: images/train
-val: images/val
-
-names:
-  0: Pothole
-  1: Crack
-  2: Manhole
