@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "class_count": 6,
+  "names": {
+    "0": "BIODEGRADABLE",
+    "1": "CARDBOARD",
+    "2": "GLASS",
+    "3": "METAL",
+    "4": "PAPER",
+    "5": "PLASTIC"
+  }
+}

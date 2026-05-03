@@ -1,0 +1,10 @@
+best.pt
+*.pt
+__pycache__/
+*.pyc
+static/uploads/
+static/results/
+static/*.sqlite
+*.log
+.env
+venv/

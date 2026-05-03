@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Garbage Detection</title>
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --card:#0f1a2e;
+      --card2:#0c162a;
+      --text:#e7eefc;
+      --muted:#9db0d3;
+      --accent:#4f8cff;
+      --accent2:#6ae4ff;
+      --border:rgba(255,255,255,.10);
+      --shadow: 0 18px 50px rgba(0,0,0,.45);
+      --radius:18px;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 600px at 20% 0%, rgba(79,140,255,.25), transparent 55%),
+                  radial-gradient(900px 500px at 100% 30%, rgba(106,228,255,.18), transparent 50%),
+                  var(--bg);
+      color:var(--text);
+      min-height:100vh;
+    }
+
+    .wrap{
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 18px 40px;
+    }
+
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom: 18px;
+    }
+
+    .brand{
+      display:flex; align-items:center; gap:12px;
+    }
+
+    .logo{
+      width:40px; height:40px; border-radius:12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 10px 30px rgba(79,140,255,.25);
+    }
+
+    h1{
+      font-size: 20px;
+      margin:0;
+      letter-spacing:.2px;
+    }
+    .sub{
+      margin:2px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px){
+      .grid{grid-template-columns:1fr}
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    .cardHeader{
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      background: rgba(15,26,46,.55);
+    }
+    .cardHeader h2{
+      margin:0;
+      font-size: 14px;
+      color: var(--text);
+      letter-spacing:.2px;
+    }
+    .badge{
+      font-size:12px;
+      color: rgba(231,238,252,.85);
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.15);
+    }
+
+    .cardBody{ padding: 16px; }
+
+    /* Drop zone */
+    .drop{
+      border: 1px dashed rgba(255,255,255,.20);
+      background: rgba(0,0,0,.18);
+      border-radius: 16px;
+      padding: 16px;
+      display:flex;
+      gap: 14px;
+      align-items:center;
+      cursor:pointer;
+      transition: .18s ease;
+      user-select:none;
+    }
+    .drop:hover{ transform: translateY(-1px); border-color: rgba(79,140,255,.55); }
+    .drop.dragover{ border-color: rgba(106,228,255,.70); background: rgba(79,140,255,.10); }
+
+    .dropIcon{
+      width:44px; height:44px;
+      border-radius: 14px;
+      display:grid; place-items:center;
+      background: rgba(79,140,255,.18);
+      border:1px solid rgba(79,140,255,.25);
+    }
+    .dropText b{ display:block; font-size: 14px; margin-bottom: 2px; }
+    .dropText span{ color: var(--muted); font-size: 12px; }
+
+    .actions{
+      display:flex;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap:wrap;
+    }
+
+    button{
+      appearance:none;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.20);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 12px;
+      cursor:pointer;
+      transition: .16s ease;
+      font-weight: 600;
+      letter-spacing:.2px;
+    }
+    button:hover{ transform: translateY(-1px); border-color: rgba(79,140,255,.55); }
+    button.primary{
+      border:none;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #06101f;
+      box-shadow: 0 12px 30px rgba(79,140,255,.25);
+    }
+    button:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+      transform:none;
+    }
+
+    .metaRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 10px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .status{
+      display:flex; align-items:center; gap:8px;
+    }
+
+    .spinner{
+      width:14px;height:14px;border-radius:50%;
+      border: 2px solid rgba(255,255,255,.25);
+      border-top-color: rgba(106,228,255,.95);
+      animation: spin .9s linear infinite;
+      display:none;
+    }
+    .loading .spinner{ display:inline-block; }
+    @keyframes spin{ to{ transform: rotate(360deg);} }
+
+    .error{
+      margin-top: 10px;
+      display:none;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,70,90,.35);
+      background: rgba(255,70,90,.10);
+      color: rgba(255,210,216,.95);
+      font-size: 13px;
+    }
+    .error.show{ display:block; }
+
+    /* Preview */
+    .previewBox{
+      margin-top: 14px;
+      border-radius: 16px;
+      overflow:hidden;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.22);
+      aspect-ratio: 16 / 10;
+      display:grid;
+      place-items:center;
+    }
+    .previewBox img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:none;
+    }
+    .previewHint{
+      color: var(--text);
+      font-size: 13px;
+      padding: 18px;
+      text-align:center;
+      font-weight: 600;
+    }
+
+    /* Output */
+    details{
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(0,0,0,.14);
+      overflow:hidden;
+    }
+    summary{
+      list-style:none;
+      cursor:pointer;
+      padding: 12px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      color: var(--text);
+      font-weight:700;
+      font-size: 13px;
+    }
+    summary::-webkit-details-marker{ display:none; }
+    .mono{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.45;
+      color: rgba(231,238,252,.95);
+      padding: 12px 14px 14px;
+      border-top: 1px solid var(--border);
+      max-height: 260px;
+      overflow:auto;
+      white-space: pre;
+    }
+
+    .imgOut{
+      width:100%;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(0,0,0,.22);
+      overflow:hidden;
+    }
+    .imgOut img{
+      width:100%;
+      height:auto;
+      display:none;
+    }
+    .imgOut .placeholder{
+      padding: 18px;
+      color: var(--text);
+      font-size: 13px;
+      text-align:center;
+      font-weight: 600;
+    }
+
+    .smallLink{
+      color: rgba(157,176,211,.95);
+      text-decoration:none;
+      border-bottom: 1px dashed rgba(157,176,211,.45);
+    }
+    .smallLink:hover{ color: var(--accent2); border-bottom-color: rgba(106,228,255,.7); }
+
+    /* Modal Styles */
+    .modal{
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal.show{ display: flex; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn{ from{ opacity: 0; } to{ opacity: 1; } }
+
+    .modalContent{
+      background: linear-gradient(180deg, rgba(79,140,255,.15), rgba(106,228,255,.10));
+      border: 2px solid var(--accent);
+      border-radius: 24px;
+      padding: 32px;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(79,140,255,.35);
+      animation: slideUp 0.4s ease;
+      position: relative;
+    }
+    @keyframes slideUp{ from{ transform: translateY(40px); opacity: 0; } to{ transform: translateY(0); opacity: 1; } }
+
+    .modalClose{
+      position: absolute;
+      top: 16px; right: 16px;
+      background: none;
+      border: none;
+      color: var(--accent2);
+      font-size: 28px;
+      cursor: pointer;
+      padding: 0;
+      width: 32px; height: 32px;
+      display: grid;
+      place-items: center;
+    }
+    .modalClose:hover{ transform: scale(1.15); }
+
+    .adviceContainer{
+      margin-bottom: 24px;
+    }
+
+    .adviceCard{
+      background: rgba(255,255,255,.08);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .adviceTitle{
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 8px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sevHigh{ color: #ff6b6b; }
+    .sevMed{ color: #ffd43b; }
+    .sevLow{ color: #51cf66; }
+
+    .adviceSubtitle{
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0 0 12px 0;
+    }
+
+    .adviceText{
+      font-size: 13px;
+      line-height: 1.6;
+      color: rgba(231,238,252,.92);
+      margin: 8px 0;
+      white-space: pre-line;
+    }
+
+    .adviceAction{
+      font-weight: 600;
+      color: var(--accent2);
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    .adviceTips{
+      font-size: 12px;
+      color: rgba(157,176,211,.85);
+      margin-top: 10px;
+      padding: 10px 0 0 0;
+      border-top: 1px solid var(--border);
+      white-space: pre-line;
+    }
+
+    .modalActions{
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      justify-content: flex-end;
+    }
+    .modalActions button{
+      padding: 12px 20px;
+      border-radius: 10px;
+    }
+    .modalActions .primary{
+      flex: 1;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>Garbage Detection</h1>
+          <div class="sub">Upload an image → detect garbage objects → view JSON + annotated result</div>
+        </div>
+      </div>
+      <div class="badge">/predict • POST</div>
+    </div>
+
+    <div class="grid">
+      <!-- Left: Upload -->
+      <div class="card" id="leftCard">
+        <div class="cardHeader">
+          <h2>Upload Image</h2>
+          <span class="badge" id="fileBadge">No file</span>
+        </div>
+
+        <div class="cardBody">
+          <input type="file" id="img" accept="image/*" hidden />
+
+          <div class="drop" id="drop">
+            <div class="dropIcon">
+              <!-- simple icon -->
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M7 17a4 4 0 0 1 .5-7.97A5 5 0 0 1 17.9 10H18a3 3 0 1 1 0 6H7Z" stroke="rgba(231,238,252,.9)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M12 12v6" stroke="rgba(6,16,31,.0)" />
+                <path d="M12 12v7" stroke="rgba(231,238,252,.9)" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M9.5 14.5 12 12l2.5 2.5" stroke="rgba(231,238,252,.9)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="dropText">
+              <b>Drag & drop an image</b>
+              <span>or click to choose a file (JPG/PNG). A preview will appear below.</span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <select id="modelSelect" title="Model" style="padding:8px 10px;border-radius:10px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.06);color:var(--text);">
+              <option value="default">YOLOv8 (best.pt)</option>
+              <option value="yolov11">YOLOv11 (best_v11.pt)</option>
+            </select>
+            <button class="primary" id="detectBtn" onclick="send()" disabled>Detect</button>
+            <button id="clearBtn" onclick="clearAll()" disabled>Clear</button>
+          </div>
+
+          <div class="metaRow" id="metaRow">
+            <div class="status" id="status">
+              <span class="spinner" id="spinner"></span>
+              <span id="statusText">Idle</span>
+            </div>
+            <a class="smallLink" href="#" onclick="copyJson(event)">Copy JSON</a>
+          </div>
+
+          <div class="error" id="errBox"></div>
+
+          <div class="previewBox" id="previewBox">
+            <div class="previewHint" id="previewHint">Preview will appear here after selecting an image.</div>
+            <img id="previewImg" alt="Preview" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Output -->
+      <div class="card">
+        <div class="cardHeader">
+          <h2>Output</h2>
+          <span class="badge" id="outBadge">Waiting</span>
+        </div>
+
+        <div class="cardBody">
+          <details open>
+            <summary>
+              JSON Response
+              <span class="badge" id="jsonSize">0 B</span>
+            </summary>
+            <pre class="mono" id="out">{}</pre>
+          </details>
+
+          <div style="height:14px"></div>
+
+          <div class="imgOut">
+            <div class="placeholder" id="resPlaceholder">Result image will appear here after detection.</div>
+            <img id="resImg" alt="Result" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advice Modal -->
+  <div class="modal" id="adviceModal">
+    <div class="modalContent">
+      <button class="modalClose" onclick="closeAdviceModal()">✕</button>
+      <h2 style="margin: 0 0 20px 0; color: var(--accent2);">🌍 Environmental Advice</h2>
+      <div class="adviceContainer" id="adviceContainer"></div>
+      <div class="modalActions">
+        <button class="primary" onclick="closeAdviceModal()">Got it! 👍</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const imgInput = document.getElementById("img");
+  const drop = document.getElementById("drop");
+  const detectBtn = document.getElementById("detectBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const fileBadge = document.getElementById("fileBadge");
+  const outBadge = document.getElementById("outBadge");
+  const out = document.getElementById("out");
+  const jsonSize = document.getElementById("jsonSize");
+  const statusText = document.getElementById("statusText");
+  const leftCard = document.getElementById("leftCard");
+  const errBox = document.getElementById("errBox");
+
+  const previewImg = document.getElementById("previewImg");
+  const previewHint = document.getElementById("previewHint");
+
+  const resImg = document.getElementById("resImg");
+  const resPlaceholder = document.getElementById("resPlaceholder");
+  const modelSelect = document.getElementById("modelSelect");
+
+  function humanBytes(bytes){
+    if (bytes < 1024) return bytes + " B";
+    const kb = bytes / 1024;
+    if (kb < 1024) return kb.toFixed(1) + " KB";
+    return (kb/1024).toFixed(1) + " MB";
+  }
+
+  function setError(msg){
+    if(!msg){
+      errBox.classList.remove("show");
+      errBox.textContent = "";
+      return;
+    }
+    errBox.textContent = msg;
+    errBox.classList.add("show");
+  }
+
+  function setLoading(isLoading){
+    if(isLoading){
+      leftCard.classList.add("loading");
+      detectBtn.disabled = true;
+      statusText.textContent = "Detecting...";
+      outBadge.textContent = "Running";
+    }else{
+      leftCard.classList.remove("loading");
+      statusText.textContent = "Idle";
+    }
+  }
+
+  function updateJson(data){
+    const text = JSON.stringify(data, null, 2);
+    out.textContent = text;
+    jsonSize.textContent = humanBytes(new Blob([text]).size);
+  }
+
+  function enableActions(hasFile){
+    detectBtn.disabled = !hasFile;
+    clearBtn.disabled = !hasFile;
+  }
+
+  function handleFile(file){
+    if(!file) return;
+    if(!file.type.startsWith("image/")){
+      setError("Please choose an image file (JPG/PNG).");
+      return;
+    }
+    setError("");
+    imgInput.files = (function(){
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      return dt.files;
+    })();
+
+    fileBadge.textContent = file.name.length > 20 ? file.name.slice(0,17)+"..." : file.name;
+    outBadge.textContent = "Ready";
+    enableActions(true);
+
+    const url = URL.createObjectURL(file);
+    previewImg.src = url;
+    previewImg.style.display = "block";
+    previewHint.style.display = "none";
+  }
+
+  drop.addEventListener("click", () => imgInput.click());
+
+  imgInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    handleFile(file);
+  });
+
+  drop.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    drop.classList.add("dragover");
+  });
+  drop.addEventListener("dragleave", () => drop.classList.remove("dragover"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("dragover");
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    handleFile(file);
+  });
+
+  async function send() {
+    const file = imgInput.files[0];
+    if (!file) return alert("Choose image first");
+
+    setError("");
+    setLoading(true);
+
+    try{
+      const fd = new FormData();
+      fd.append("image", file);
+      try{ fd.append("model", (modelSelect && modelSelect.value) || "default"); }catch(e){}
+
+      const r = await fetch("/predict", { method: "POST", body: fd });
+
+      if(!r.ok){
+        const t = await r.text().catch(()=> "");
+        throw new Error("Server error ("+r.status+"). " + (t ? t.slice(0,120) : ""));
+      }
+
+      const data = await r.json();
+      updateJson(data);
+      outBadge.textContent = "Done";
+
+      if (data.result_image) {
+        resImg.src = data.result_image + "?t=" + Date.now();
+        resImg.style.display = "block";
+        resPlaceholder.style.display = "none";
+      } else {
+        resImg.style.display = "none";
+        resPlaceholder.style.display = "block";
+      }
+
+      // Show advice modal
+      showAdviceModal(data);
+    }catch(err){
+      outBadge.textContent = "Error";
+      setError(err.message || "Something went wrong.");
+    }finally{
+      setLoading(false);
+      enableActions(!!imgInput.files[0]);
+    }
+  }
+
+  function clearAll(){
+    imgInput.value = "";
+    fileBadge.textContent = "No file";
+    outBadge.textContent = "Waiting";
+    updateJson({});
+    setError("");
+
+    previewImg.src = "";
+    previewImg.style.display = "none";
+    previewHint.style.display = "block";
+
+    resImg.src = "";
+    resImg.style.display = "none";
+    resPlaceholder.style.display = "block";
+
+    enableActions(false);
+  }
+
+  function copyJson(e){
+    e.preventDefault();
+    const text = out.textContent || "";
+    navigator.clipboard.writeText(text).then(()=>{
+      statusText.textContent = "JSON copied ✓";
+      setTimeout(()=> statusText.textContent = leftCard.classList.contains("loading") ? "Detecting..." : "Idle", 900);
+    }).catch(()=> {
+      setError("Copy failed. Please copy manually.");
+    });
+  }
+
+  function getSeverityColor(severity){
+    if(severity === "high") return "sevHigh";
+    if(severity === "medium") return "sevMed";
+    return "sevLow";
+  }
+
+  function showAdviceModal(data){
+    const container = document.getElementById("adviceContainer");
+    container.innerHTML = "";
+
+    const detections = data.unique_detections || data.detections || [];
+    if(detections.length === 0){
+      container.innerHTML = '<div class="adviceCard" style="text-align:center;"><p>No garbage detected. Great! 🌱</p></div>';
+    }else{
+      detections.forEach((det, idx) => {
+        const advice = det.advice || {};
+        const sevClass = getSeverityColor(advice.severity);
+        
+        const card = document.createElement("div");
+        card.className = "adviceCard";
+        card.innerHTML = `
+          <div class="adviceTitle ${sevClass}">
+            ${det.class_name} (${(det.confidence * 100).toFixed(1)}% confidence)
+          </div>
+          <div class="adviceSubtitle">${advice.advice || ""}</div>
+          <div class="adviceText">${advice.details || ""}</div>
+          <div class="adviceAction">${advice.action || ""}</div>
+          <div class="adviceTips">${advice.tips || ""}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+    
+    document.getElementById("adviceModal").classList.add("show");
+  }
+
+  function closeAdviceModal(){
+    document.getElementById("adviceModal").classList.remove("show");
+  }
+
+  // Close modal on background click
+  document.getElementById("adviceModal").addEventListener("click", (e) => {
+    if(e.target.id === "adviceModal") closeAdviceModal();
+  });
+
+  // init
+  updateJson({});
+  enableActions(false);
+</script>
+</body>
+</html>
