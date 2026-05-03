@@ -1,0 +1,2 @@
+Model,Accuracy,Precision,Recall,Architecture,Classes,Threshold
+Road Detection (YOLOv8),94.2%,93.5%,94.9%,8-model ensemble,"road, pothole, crack, pavement, asphalt",50%

@@ -1,0 +1,118 @@
+“compline priority analysis using GIS and text classification techniques”
+
+This API helps government officers to:
+
+--read complaint text (road / garbage)
+--use location (GIS / OSM) to understand nearby context
+--detect recurring complaints
+--calculate a priority score (0–100) and priority level
+--show an explainable officer output (clear reasons)
+-- Important: This system supports officers, it does not replace their decision. 
+
+Update Component
+
+2) Main workflow (simple)
+
+Citizen submits complaint (text + location link / lat lon)
+System expands text (optional)
+AI/NLP reads text → urgency / impact / frequency signals
+GIS/OSM fetch checks nearby map features (POI, road class, bridges/crossings, junctions)
+Recurring detection checks same area complaints
+Priority score + level + track (Planning / Operational)
+Officer gets clear output (summary + reasons + GIS popup details) 
+Update Component
+
+------------------------------------------------------------------------------
+
+3) Folder structure (what each file does)
+sarma_backend/
+├── app/
+│ ├── model_sarma/
+│ ├── routers_sarma/
+│ ├── schemas_sarma/
+| ├── services_sarma
+│ ├── database_sarma.py
+│ ├── main_sarma.py
+│ └── setting_samra.py
+│
+├── docs_sarma/
+├── scripts_sarma/
+│
+└── README
+-------------------------------------------------------------------------------
+
+ app/services_sarma/
+
+All logic (your “brains”):
+ --> text_expansion_service_sa.py → expand complaint text (optional)
+
+--> text_severity_service_sa.py → urgency/impact/frequency → text severity
+--> ml_prediction_service_sa.py → ML suggestion (supporting only)
+--> osm_fetch_service_sa.py → real OSM fetch using Overpass API (dynamic)
+--> gis_summary_builder_sa.py → makes officer-friendly GIS summary line
+--> gis_usage_service_sa.py + gis_usage_helpers_sa.py → Hybrid GIS score calculation
+--> recurring_detection_service_sa.py → recurring count + is_recurring
+--> recurring_severity_service_sa.py → recurring severity score
+--> priority_scoring_service_sa.py → final score = Text + GIS + Recurring
+--> priority_level_service_sa.py → score → level (High/Medium/Low)
+--> track_decision_service_sa.py → Planning vs Operational
+--> officer_output_service_sa.py → builds final officer JSON (ordered + explainable)
+
+
+4) Required packages (install list)
+
+Create a virtual environment (recommended):
+
+Windows (PowerShell)
+python -m venv .venv
+.venv\Scripts\activate
+
+
+Install dependencies:
+
+pip install fastapi uvicorn sqlalchemy pydantic pydantic-settings requests
+pip install scikit-learn pandas joblib
+pip install geopy
+
+
+Optional (only if you use .env nicely):
+
+pip install python-dotenv
+
+5) How to run the backend
+
+Go inside the backend root (where app/ exists), then:
+
+uvicorn app.main_sarma:app --reload
+
+
+Now open:
+
+Swagger UI: http://127.0.0.1:8000/docs
+
+6) How to use the API
+A) Submit complaint
+
+POST /complaints/submit
+
+Example JSON:
+
+{
+  "category": "road",
+  "text": "There is no proper bridge here. Very dangerous during rainy season.",
+  "expand_text": true,
+  "location_link": "https://maps.app.goo.gl/HwWQsFdGHa7C8siv6"
+}
+
+B) Officer view
+
+GET /officer/complaint/1
+
+It returns:
+summary (priority level/score)
+location link
+why_this_priority list
+gis details_for_popup
+recurring info
+AI suggestion note (supporting only)
+track decision

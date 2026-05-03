@@ -1,0 +1,2 @@
+Model,Accuracy,Precision,Recall,Architecture,Classes,Threshold
+Abuse Detection (YOLOv8),76.8%,78.5%,75.1%,6-model weighted ensemble,"weapons, violence, blood, abusive content",45-65%
