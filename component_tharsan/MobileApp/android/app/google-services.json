@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "30101543321",
+    "project_id": "income-expenses-app360",
+    "storage_bucket": "income-expenses-app360.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:30101543321:android:3ecd033131b998197fdb08",
+        "android_client_info": {
+          "package_name": "Income.expenses.App"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhFZtKHNxH4MVCQNKd5MA35M6rJoHzh_I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1",
+  "environment": {
+    "environment_type": "Unspecified"
+  },
+  "apps": [
+    {
+      "app_id": "1:30101543321:android:3ecd033131b998197fdb08",
+      "app_nickname": "Income expenses App",
+      "package_name": "Income.expenses.App",
+      "sha_certificate_fingerprints": []
+    }
+  ]
+}
