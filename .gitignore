@@ -1,0 +1,138 @@
+# =====================================================
+# PYTHON
+# =====================================================
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# =====================================================
+# SECRETS & ENV FILES (IMPORTANT)
+# =====================================================
+.env
+*.env
+
+# Keep example env file for others
+!.env.example
+
+# =====================================================
+# DATABASE & USER DATA (DO NOT PUSH)
+# =====================================================
+*.db
+*.sqlite
+*.sqlite3
+
+# User uploaded content
+uploads/
+application/backend/uploads/
+
+# =====================================================
+# MACHINE LEARNING MODELS & DATA (VERY LARGE)
+# =====================================================
+# Model weights
+*.pt
+*.pth
+*.weights
+*.onnx
+*.h5
+*.ckpt
+
+# Training runs & outputs
+runs/
+weights/
+checkpoints/
+
+# Datasets (huge / long filenames)
+datasets/
+data/dataset/
+**/data/dataset/
+**/dataset/
+
+# Keep empty model folders if needed
+!models/.gitkeep
+
+# =====================================================
+# FLUTTER / DART
+# =====================================================
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub/
+.pub-cache/
+.packages
+
+# Flutter build outputs (CRITICAL)
+build/
+**/build/
+
+# =====================================================
+# ANDROID (CRITICAL – CAUSE OF YOUR ERROR)
+# =====================================================
+application/android/app/build/
+application/android/app/.cxx/
+application/android/build/
+application/android/.gradle/
+**/.cxx/
+
+# APKs / AABs
+*.apk
+*.aab
+
+# =====================================================
+# iOS / macOS (Flutter)
+# =====================================================
+application/ios/Pods/
+application/ios/Flutter/ephemeral/
+application/macos/Flutter/ephemeral/
+
+# =====================================================
+# NODE / REACT / WEBSITE
+# =====================================================
+node_modules/
+dist/
+.out/
+.next/
+coverage/
+
+# Lock files (optional but safe)
+package-lock.json
+bun.lockb
+yarn.lock
+
+# =====================================================
+# LOGS & TEMP FILES
+# =====================================================
+*.log
+*.tmp
+*.temp
+backend_error.txt
+error_log.txt
+
+# =====================================================
+# IDE & OS FILES
+# =====================================================
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =====================================================
+# KEEP EMPTY FOLDERS (OPTIONAL)
+# =====================================================
+!.gitkeep
+
+# Gradle logs
+application/android/gradle_build_log.txt
+
+# =====================================================
+# COMPONENT FOLDERS
+# =====================================================
+component_tharsan_2/
